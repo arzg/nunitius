@@ -8,13 +8,20 @@ fn main() -> anyhow::Result<()> {
     let mut stream = TcpStream::connect("127.0.0.1:9999")?;
 
     let nickname = read_input("Choose a nickname", &stdin, &mut stdout)?;
-    let login = Login { nickname };
+    let login = Login {
+        nickname: nickname.clone(),
+    };
 
     jsonl::write(&mut stream, &Event::Login(login))?;
 
     loop {
         let input = read_input("Type a message", &stdin, &mut stdout)?;
-        let message = Message(input);
+
+        let message = Message {
+            body: input,
+            author: nickname.clone(),
+        };
+
         jsonl::write(&mut stream, &Event::Message(message))?;
     }
 }

@@ -26,7 +26,7 @@ fn handle_connection(stream: TcpStream) -> anyhow::Result<()> {
         let event: Event = jsonl::read(&mut stream)?;
 
         match event {
-            Event::Message(Message(message)) => println!("{}", message),
+            Event::Message(Message { body, author }) => println!("{}: {}", author, body),
             Event::Login(Login { nickname }) => println!("Login with nickname {}", nickname),
         };
     }

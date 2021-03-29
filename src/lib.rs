@@ -7,7 +7,10 @@ pub enum Event {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Message(pub String);
+pub struct Message {
+    pub body: String,
+    pub author: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Login {

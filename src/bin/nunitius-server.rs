@@ -1,4 +1,4 @@
-use nunitius::Message;
+use nunitius::{Event, Login, Message};
 use std::io::BufReader;
 use std::net::TcpListener;
 
@@ -9,8 +9,12 @@ fn main() -> anyhow::Result<()> {
         let stream = stream?;
         let mut stream = BufReader::new(stream);
 
-        let message: Message = jsonl::read(&mut stream)?;
-        println!("{}", message.0);
+        let event: Event = jsonl::read(&mut stream)?;
+
+        match event {
+            Event::Message(Message(message)) => println!("{}", message),
+            Event::Login(Login { nickname }) => println!("Login with nickname {}", nickname),
+        };
     }
 
     Ok(())

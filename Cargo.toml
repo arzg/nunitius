@@ -5,3 +5,4 @@ name = "nunitius"
 version = "0.1.0"
 
 [dependencies]
+anyhow = "1.0"

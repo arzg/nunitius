@@ -22,12 +22,20 @@ fn main() -> anyhow::Result<()> {
 fn handle_connection(stream: TcpStream) -> anyhow::Result<()> {
     let mut stream = BufReader::new(stream);
 
+    let event = jsonl::read(&mut stream)?;
+
+    if let Event::Login(Login { nickname }) = event {
+        println!("Login with nickname {}", nickname);
+    } else {
+        anyhow::bail!("expected connection to begin with login");
+    }
+
     loop {
-        let event: Event = jsonl::read(&mut stream)?;
+        let event = jsonl::read(&mut stream)?;
 
         match event {
             Event::Message(Message { body, author }) => println!("{}: {}", author, body),
-            Event::Login(Login { nickname }) => println!("Login with nickname {}", nickname),
+            Event::Login(_) => anyhow::bail!("only expected one login each connection"),
         };
     }
 }

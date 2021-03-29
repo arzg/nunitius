@@ -1,17 +1,16 @@
-use std::io::Read;
+use nunitius::Message;
+use std::io::BufReader;
 use std::net::TcpListener;
 
 fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:9999")?;
 
     for stream in listener.incoming() {
-        let mut stream = stream?;
+        let stream = stream?;
+        let mut stream = BufReader::new(stream);
 
-        let mut text_from_connection = Vec::new();
-        stream.read_to_end(&mut text_from_connection)?;
-
-        let text_from_connection = String::from_utf8_lossy(&text_from_connection);
-        println!("{}", text_from_connection);
+        let message: Message = jsonl::read(&mut stream)?;
+        println!("{}", message.0);
     }
 
     Ok(())

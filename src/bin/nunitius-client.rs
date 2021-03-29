@@ -5,19 +5,17 @@ use std::net::TcpStream;
 fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
+    let mut stream = TcpStream::connect("127.0.0.1:9999")?;
 
     let nickname = read_input("Choose a nickname", &stdin, &mut stdout)?;
     let login = Login { nickname };
 
-    let stream = TcpStream::connect("127.0.0.1:9999")?;
-    jsonl::write(stream, &Event::Login(login))?;
+    jsonl::write(&mut stream, &Event::Login(login))?;
 
     loop {
-        let stream = TcpStream::connect("127.0.0.1:9999")?;
-
         let input = read_input("Type a message", &stdin, &mut stdout)?;
         let message = Message(input);
-        jsonl::write(stream, &Event::Message(message))?;
+        jsonl::write(&mut stream, &Event::Message(message))?;
     }
 }
 

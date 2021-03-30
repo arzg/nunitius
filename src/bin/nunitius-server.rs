@@ -1,4 +1,6 @@
-use nunitius::{Event, Login, Message};
+use flume::{Receiver, Selector, Sender};
+use nunitius::{ConnectionKind, Event, Login, Message};
+use std::cell::RefCell;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
@@ -6,11 +8,18 @@ use std::thread;
 fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:9999")?;
 
+    let (viewer_tx, viewer_rx) = flume::bounded(100);
+    let (events_tx, events_rx) = flume::bounded(100);
+
+    thread::spawn(|| viewer_handler(events_rx, viewer_rx));
+
     for stream in listener.incoming() {
         let stream = stream?;
+        let viewer_tx = viewer_tx.clone();
+        let events_tx = events_tx.clone();
 
         thread::spawn(|| {
-            if let Err(e) = handle_connection(stream) {
+            if let Err(e) = handle_connection(stream, viewer_tx, events_tx) {
                 eprintln!("Error: {}", e);
             }
         });
@@ -19,23 +28,47 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn handle_connection(stream: TcpStream) -> anyhow::Result<()> {
+fn handle_connection(
+    stream: TcpStream,
+    viewer_tx: Sender<TcpStream>,
+    events_tx: Sender<Event>,
+) -> anyhow::Result<()> {
     let mut stream = BufReader::new(stream);
 
-    let event = jsonl::read(&mut stream)?;
+    let connection_kind: ConnectionKind = jsonl::read(&mut stream)?;
 
-    if let Event::Login(Login { nickname }) = event {
-        println!("Login with nickname {}", nickname);
-    } else {
-        anyhow::bail!("expected connection to begin with login");
+    match connection_kind {
+        ConnectionKind::Sender => {
+            let login: Login = jsonl::read(&mut stream)?;
+            events_tx.send(Event::Login(login)).unwrap();
+
+            loop {
+                let message: Message = jsonl::read(&mut stream)?;
+                events_tx.send(Event::Message(message)).unwrap();
+            }
+        }
+        ConnectionKind::Viewer => viewer_tx.send(stream.into_inner()).unwrap(),
     }
 
-    loop {
-        let event = jsonl::read(&mut stream)?;
+    Ok(())
+}
 
-        match event {
-            Event::Message(Message { body, author }) => println!("{}: {}", author, body),
-            Event::Login(_) => anyhow::bail!("only expected one login each connection"),
-        };
+fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
+    let viewers = RefCell::new(Vec::new());
+
+    loop {
+        Selector::new()
+            .recv(&viewer_rx, |viewer| {
+                viewers.borrow_mut().push(viewer.unwrap());
+            })
+            .recv(&events_rx, |event| {
+                let event = event.unwrap();
+                for viewer in viewers.borrow_mut().iter_mut() {
+                    if let Err(e) = jsonl::write(viewer, &event) {
+                        eprintln!("Error: {}", anyhow::Error::new(e));
+                    }
+                }
+            })
+            .wait();
     }
 }

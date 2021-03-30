@@ -16,3 +16,9 @@ pub struct Message {
 pub struct Login {
     pub nickname: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ConnectionKind {
+    Sender,
+    Viewer,
+}

@@ -1,4 +1,4 @@
-use nunitius::{Event, Login, Message};
+use nunitius::{ConnectionKind, Login, Message};
 use std::io::{self, Write};
 use std::net::TcpStream;
 
@@ -7,12 +7,13 @@ fn main() -> anyhow::Result<()> {
     let mut stdout = io::stdout();
     let mut stream = TcpStream::connect("127.0.0.1:9999")?;
 
+    jsonl::write(&mut stream, &ConnectionKind::Sender)?;
+
     let nickname = read_input("Choose a nickname", &stdin, &mut stdout)?;
     let login = Login {
         nickname: nickname.clone(),
     };
-
-    jsonl::write(&mut stream, &Event::Login(login))?;
+    jsonl::write(&mut stream, &login)?;
 
     loop {
         let input = read_input("Type a message", &stdin, &mut stdout)?;
@@ -22,7 +23,7 @@ fn main() -> anyhow::Result<()> {
             author: nickname.clone(),
         };
 
-        jsonl::write(&mut stream, &Event::Message(message))?;
+        jsonl::write(&mut stream, &message)?;
     }
 }
 

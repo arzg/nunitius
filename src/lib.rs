@@ -18,6 +18,11 @@ pub struct Login {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub nickname_taken: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ConnectionKind {
     Sender,
     Viewer,

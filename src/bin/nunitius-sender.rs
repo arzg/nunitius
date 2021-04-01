@@ -1,19 +1,20 @@
-use nunitius::{ConnectionKind, Login, Message};
+use jsonl::Connection;
+use nunitius::{ConnectionKind, Login, LoginResponse, Message};
 use std::io::{self, Write};
 use std::net::TcpStream;
+
+type TcpConnection = Connection<io::BufReader<TcpStream>, TcpStream>;
 
 fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let mut stream = TcpStream::connect("127.0.0.1:9999")?;
 
-    jsonl::write(&mut stream, &ConnectionKind::Sender)?;
+    let stream = TcpStream::connect("127.0.0.1:9999")?;
+    let mut connection = Connection::new_from_tcp_stream(stream)?;
 
-    let nickname = read_input("Choose a nickname", &stdin, &mut stdout)?;
-    let login = Login {
-        nickname: nickname.clone(),
-    };
-    jsonl::write(&mut stream, &login)?;
+    connection.write(&ConnectionKind::Sender)?;
+
+    let nickname = login(&stdin, &mut stdout, &mut connection)?;
 
     loop {
         let input = read_input("Type a message", &stdin, &mut stdout)?;
@@ -23,7 +24,30 @@ fn main() -> anyhow::Result<()> {
             author: nickname.clone(),
         };
 
-        jsonl::write(&mut stream, &message)?;
+        connection.write(&message)?;
+    }
+}
+
+fn login(
+    stdin: &io::Stdin,
+    stdout: &mut io::Stdout,
+    connection: &mut TcpConnection,
+) -> Result<String, anyhow::Error> {
+    loop {
+        let nickname = read_input("Choose a nickname", stdin, stdout)?;
+
+        let login = Login {
+            nickname: nickname.clone(),
+        };
+        connection.write(&login)?;
+
+        let response: LoginResponse = connection.read()?;
+
+        if response.nickname_taken {
+            eprintln!("Username ‘{}’ taken. Try another one.", nickname);
+        } else {
+            return Ok(nickname);
+        }
     }
 }
 

@@ -2,9 +2,8 @@ use flume::{Receiver, Selector, Sender};
 use nunitius::{ConnectionKind, Event, Login, LoginResponse, Message};
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
-use std::thread;
+use std::{io, thread};
 
 fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:9999")?;
@@ -38,7 +37,7 @@ fn handle_connection(
     events_tx: Sender<Event>,
     nickname_tx: Sender<(String, Sender<bool>)>,
 ) -> anyhow::Result<()> {
-    let mut stream = BufReader::new(stream);
+    let mut stream = io::BufReader::new(stream);
     let connection_kind: ConnectionKind = jsonl::read(&mut stream)?;
     let stream = stream.into_inner();
 
@@ -86,10 +85,26 @@ fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
             })
             .recv(&events_rx, |event| {
                 let event = event.unwrap();
-                for viewer in viewers.borrow_mut().iter_mut() {
-                    if let Err(e) = jsonl::write(viewer, &event) {
-                        eprintln!("Error: {}", anyhow::Error::new(e));
+
+                let mut closed_viewers = Vec::new();
+                let mut viewers = viewers.borrow_mut();
+
+                for (idx, viewer) in viewers.iter_mut().enumerate() {
+                    match jsonl::write(viewer, &event) {
+                        Ok(()) => {}
+
+                        Err(jsonl::WriteError::Io(io_error))
+                            if io_error.kind() == io::ErrorKind::BrokenPipe =>
+                        {
+                            closed_viewers.push(idx);
+                        }
+
+                        Err(e) => eprintln!("Error: {}", anyhow::Error::new(e)),
                     }
+                }
+
+                for idx in closed_viewers {
+                    viewers.remove(idx);
                 }
             })
             .wait();

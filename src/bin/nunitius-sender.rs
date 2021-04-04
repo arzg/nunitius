@@ -56,7 +56,7 @@ fn login(
         let response: LoginResponse = connection.read()?;
 
         if response.nickname_taken {
-            eprintln!("Username ‘{}’ taken. Try another one.", nickname);
+            eprintln!("Nickname ‘{}’ taken. Try another one.", nickname);
         } else {
             return Ok(nickname);
         }

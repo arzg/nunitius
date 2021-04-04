@@ -12,7 +12,7 @@ pub struct Message {
     pub author: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Login {
     pub nickname: String,
 }

@@ -1,5 +1,5 @@
 use flume::{Receiver, Selector, Sender};
-use nunitius::{ConnectionKind, Event, Login, LoginResponse, Message};
+use nunitius::{ConnectionKind, Event, Login, LoginResponse};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::net::{TcpListener, TcpStream};
@@ -45,7 +45,7 @@ fn handle_connection(
         ConnectionKind::Sender => {
             let mut connection = jsonl::Connection::new_from_tcp_stream(stream)?;
 
-            loop {
+            let nickname = loop {
                 let login: Login = connection.read()?;
 
                 let is_nickname_taken = {
@@ -64,14 +64,24 @@ fn handle_connection(
                 })?;
 
                 if !is_nickname_taken {
-                    events_tx.send(Event::Login(login)).unwrap();
-                    break;
+                    events_tx.send(Event::Login(login.clone())).unwrap();
+                    break login.nickname;
                 }
-            }
+            };
 
             loop {
-                let message: Message = connection.read()?;
-                events_tx.send(Event::Message(message)).unwrap();
+                match connection.read() {
+                    Ok(message) => events_tx.send(Event::Message(message)).unwrap(),
+
+                    Err(jsonl::ReadError::Eof) => {
+                        nickname_event_tx
+                            .send(NicknameEvent::Logout { nickname })
+                            .unwrap();
+                        break;
+                    }
+
+                    Err(e) => return Err(e.into()),
+                }
             }
         }
         ConnectionKind::Viewer => viewer_tx.send(stream).unwrap(),
@@ -128,6 +138,14 @@ fn nickname_handler(nickname_event_rx: Receiver<NicknameEvent>) {
                 let is_nickname_taken = !taken_nicknames.insert(nickname);
                 is_taken_tx.send(is_nickname_taken).unwrap();
             }
+
+            NicknameEvent::Logout { nickname } => {
+                let was_taken = taken_nicknames.remove(&nickname);
+
+                // panic if the nickname we were told is logging out
+                // was not taken in the first place
+                assert!(was_taken);
+            }
         }
     }
 }
@@ -136,5 +154,8 @@ enum NicknameEvent {
     Login {
         nickname: String,
         is_taken_tx: Sender<bool>,
+    },
+    Logout {
+        nickname: String,
     },
 }

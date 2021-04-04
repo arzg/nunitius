@@ -19,6 +19,12 @@ fn main() -> anyhow::Result<()> {
     loop {
         let input = read_input("Type a message", &stdin, &mut stdout)?;
 
+        let input = if let Some(i) = input {
+            i
+        } else {
+            continue;
+        };
+
         let message = Message {
             body: input,
             author: nickname.clone(),
@@ -36,6 +42,12 @@ fn login(
     loop {
         let nickname = read_input("Choose a nickname", stdin, stdout)?;
 
+        let nickname = if let Some(n) = nickname {
+            n
+        } else {
+            continue;
+        };
+
         let login = Login {
             nickname: nickname.clone(),
         };
@@ -51,12 +63,18 @@ fn login(
     }
 }
 
-fn read_input(prompt: &str, stdin: &io::Stdin, stdout: &mut io::Stdout) -> anyhow::Result<String> {
+fn read_input(
+    prompt: &str,
+    stdin: &io::Stdin,
+    stdout: &mut io::Stdout,
+) -> anyhow::Result<Option<String>> {
     write!(stdout, "{} > ", prompt)?;
     stdout.flush()?;
 
     let mut input = String::new();
     stdin.read_line(&mut input)?;
 
-    Ok(input.trim().to_string())
+    let input = input.trim().to_string();
+
+    Ok(if input.is_empty() { None } else { Some(input) })
 }

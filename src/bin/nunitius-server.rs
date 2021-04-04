@@ -38,7 +38,7 @@ fn handle_connection(
     nickname_event_tx: Sender<NicknameEvent>,
 ) -> anyhow::Result<()> {
     let mut stream = io::BufReader::new(stream);
-    let connection_kind: ConnectionKind = jsonl::read(&mut stream)?;
+    let connection_kind = jsonl::read(&mut stream)?;
     let stream = stream.into_inner();
 
     match connection_kind {

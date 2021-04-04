@@ -10,19 +10,19 @@ fn main() -> anyhow::Result<()> {
 
     let (viewer_tx, viewer_rx) = flume::bounded(100);
     let (events_tx, events_rx) = flume::bounded(100);
-    let (nickname_tx, nickname_rx) = flume::bounded(100);
+    let (nickname_event_tx, nickname_event_rx) = flume::bounded(100);
 
     thread::spawn(|| viewer_handler(events_rx, viewer_rx));
-    thread::spawn(|| nickname_handler(nickname_rx));
+    thread::spawn(|| nickname_handler(nickname_event_rx));
 
     for stream in listener.incoming() {
         let stream = stream?;
         let viewer_tx = viewer_tx.clone();
         let events_tx = events_tx.clone();
-        let nickname_tx = nickname_tx.clone();
+        let nickname_event_tx = nickname_event_tx.clone();
 
         thread::spawn(|| {
-            if let Err(e) = handle_connection(stream, viewer_tx, events_tx, nickname_tx) {
+            if let Err(e) = handle_connection(stream, viewer_tx, events_tx, nickname_event_tx) {
                 eprintln!("Error: {}", e);
             }
         });
@@ -35,7 +35,7 @@ fn handle_connection(
     stream: TcpStream,
     viewer_tx: Sender<TcpStream>,
     events_tx: Sender<Event>,
-    nickname_tx: Sender<(String, Sender<bool>)>,
+    nickname_event_tx: Sender<NicknameEvent>,
 ) -> anyhow::Result<()> {
     let mut stream = io::BufReader::new(stream);
     let connection_kind: ConnectionKind = jsonl::read(&mut stream)?;
@@ -50,7 +50,12 @@ fn handle_connection(
 
                 let is_nickname_taken = {
                     let (is_nickname_taken_tx, is_nickname_taken_rx) = flume::bounded(0);
-                    nickname_tx.send((login.nickname.clone(), is_nickname_taken_tx))?;
+
+                    nickname_event_tx.send(NicknameEvent::Login {
+                        nickname: login.nickname.clone(),
+                        is_taken_tx: is_nickname_taken_tx,
+                    })?;
+
                     is_nickname_taken_rx.recv().unwrap()
                 };
 
@@ -111,11 +116,25 @@ fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
     }
 }
 
-fn nickname_handler(nickname_rx: Receiver<(String, Sender<bool>)>) {
+fn nickname_handler(nickname_event_rx: Receiver<NicknameEvent>) {
     let mut taken_nicknames = HashSet::new();
 
-    for (nickname, is_taken_tx) in nickname_rx {
-        let is_nickname_taken = !taken_nicknames.insert(nickname);
-        is_taken_tx.send(is_nickname_taken).unwrap();
+    for nickname_event in nickname_event_rx {
+        match nickname_event {
+            NicknameEvent::Login {
+                nickname,
+                is_taken_tx,
+            } => {
+                let is_nickname_taken = !taken_nicknames.insert(nickname);
+                is_taken_tx.send(is_nickname_taken).unwrap();
+            }
+        }
     }
+}
+
+enum NicknameEvent {
+    Login {
+        nickname: String,
+        is_taken_tx: Sender<bool>,
+    },
 }

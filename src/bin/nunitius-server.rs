@@ -1,7 +1,7 @@
 use flume::{Receiver, Selector, Sender};
 use nunitius::{ConnectionKind, Event, Login, LoginResponse};
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::{TcpListener, TcpStream};
 use std::{io, thread};
 use tracing::{error, info, span, Level};
@@ -118,39 +118,53 @@ fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
     let span = span!(Level::INFO, "handling_viewers");
     let _guard = span.enter();
 
-    let viewers = RefCell::new(Vec::new());
+    let viewers = RefCell::new(HashMap::new());
+    let mut current_viewer_idx = 0;
 
     loop {
         Selector::new()
             .recv(&viewer_rx, |viewer| {
                 info!("received new viewer");
-                viewers.borrow_mut().push(viewer.unwrap());
+
+                viewers
+                    .borrow_mut()
+                    .insert(current_viewer_idx, viewer.unwrap());
+
+                current_viewer_idx += 1;
             })
             .recv(&events_rx, |event| {
                 info!("received event");
                 let event = event.unwrap();
 
                 let mut closed_viewers = Vec::new();
-                let mut viewers = viewers.borrow_mut();
 
-                for (idx, viewer) in viewers.iter_mut().enumerate() {
-                    match jsonl::write(viewer, &event) {
-                        Ok(()) => info!("forwarded event to viewer"),
+                {
+                    let mut viewers = viewers.borrow_mut();
+                    for (idx, viewer) in viewers.iter_mut() {
+                        match jsonl::write(viewer, &event) {
+                            Ok(()) => info!("forwarded event to viewer"),
 
-                        Err(jsonl::WriteError::Io(io_error))
-                            if io_error.kind() == io::ErrorKind::BrokenPipe =>
-                        {
-                            info!("found closed viewer");
-                            closed_viewers.push(idx);
+                            Err(jsonl::WriteError::Io(io_error))
+                                if io_error.kind() == io::ErrorKind::BrokenPipe =>
+                            {
+                                info!("found closed viewer");
+                                closed_viewers.push(*idx);
+                            }
+
+                            Err(e) => error!("{:#}", anyhow::Error::new(e)),
                         }
-
-                        Err(e) => error!("{:#}", anyhow::Error::new(e)),
                     }
                 }
 
+                let mut viewers = viewers.borrow_mut();
                 for idx in closed_viewers {
                     info!("removed closed viewer");
-                    viewers.remove(idx);
+
+                    let removed_viewer = viewers.remove(&idx);
+
+                    // we know the viewer we just removed
+                    // was present in the HashMap
+                    assert!(removed_viewer.is_some())
                 }
             })
             .wait();

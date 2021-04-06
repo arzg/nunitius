@@ -4,8 +4,13 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::net::{TcpListener, TcpStream};
 use std::{io, thread};
+use tracing::{error, info, span, Level};
 
 fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .init();
+
     let listener = TcpListener::bind("127.0.0.1:9999")?;
 
     let (viewer_tx, viewer_rx) = flume::bounded(100);
@@ -22,8 +27,15 @@ fn main() -> anyhow::Result<()> {
         let nickname_event_tx = nickname_event_tx.clone();
 
         thread::spawn(|| {
+            let span = span!(
+                Level::INFO,
+                "handling_connection",
+                addr = debug(stream.peer_addr()),
+            );
+            let _guard = span.enter();
+
             if let Err(e) = handle_connection(stream, viewer_tx, events_tx, nickname_event_tx) {
-                eprintln!("Error: {}", e);
+                error!("{:#}", e);
             }
         });
     }
@@ -41,12 +53,15 @@ fn handle_connection(
     let connection_kind = jsonl::read(&mut stream)?;
     let stream = stream.into_inner();
 
+    info!(?connection_kind);
+
     match connection_kind {
         ConnectionKind::Sender => {
             let mut connection = jsonl::Connection::new_from_tcp_stream(stream)?;
 
             let nickname = loop {
                 let login: Login = connection.read()?;
+                info!(?login, "read login from sender");
 
                 let is_nickname_taken = {
                     let (is_nickname_taken_tx, is_nickname_taken_rx) = flume::bounded(0);
@@ -63,7 +78,10 @@ fn handle_connection(
                     nickname_taken: is_nickname_taken,
                 })?;
 
-                if !is_nickname_taken {
+                if is_nickname_taken {
+                    info!("nickname was taken, retrying");
+                } else {
+                    info!("logged in with unique nickname");
                     events_tx.send(Event::Login(login.clone())).unwrap();
                     break login.nickname;
                 }
@@ -71,12 +89,18 @@ fn handle_connection(
 
             loop {
                 match connection.read() {
-                    Ok(message) => events_tx.send(Event::Message(message)).unwrap(),
+                    Ok(message) => {
+                        info!("received message");
+                        events_tx.send(Event::Message(message)).unwrap();
+                    }
 
                     Err(jsonl::ReadError::Eof) => {
+                        info!("logged out");
+
                         nickname_event_tx
                             .send(NicknameEvent::Logout { nickname })
                             .unwrap();
+
                         break;
                     }
 
@@ -91,14 +115,19 @@ fn handle_connection(
 }
 
 fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
+    let span = span!(Level::INFO, "handling_viewers");
+    let _guard = span.enter();
+
     let viewers = RefCell::new(Vec::new());
 
     loop {
         Selector::new()
             .recv(&viewer_rx, |viewer| {
+                info!("received new viewer");
                 viewers.borrow_mut().push(viewer.unwrap());
             })
             .recv(&events_rx, |event| {
+                info!("received event");
                 let event = event.unwrap();
 
                 let mut closed_viewers = Vec::new();
@@ -106,19 +135,21 @@ fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
 
                 for (idx, viewer) in viewers.iter_mut().enumerate() {
                     match jsonl::write(viewer, &event) {
-                        Ok(()) => {}
+                        Ok(()) => info!("forwarded event to viewer"),
 
                         Err(jsonl::WriteError::Io(io_error))
                             if io_error.kind() == io::ErrorKind::BrokenPipe =>
                         {
+                            info!("found closed viewer");
                             closed_viewers.push(idx);
                         }
 
-                        Err(e) => eprintln!("Error: {}", anyhow::Error::new(e)),
+                        Err(e) => error!("{:#}", anyhow::Error::new(e)),
                     }
                 }
 
                 for idx in closed_viewers {
+                    info!("removed closed viewer");
                     viewers.remove(idx);
                 }
             })
@@ -127,6 +158,9 @@ fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
 }
 
 fn nickname_handler(nickname_event_rx: Receiver<NicknameEvent>) {
+    let span = span!(Level::INFO, "handling_nicknames");
+    let _guard = span.enter();
+
     let mut taken_nicknames = HashSet::new();
 
     for nickname_event in nickname_event_rx {
@@ -135,11 +169,22 @@ fn nickname_handler(nickname_event_rx: Receiver<NicknameEvent>) {
                 nickname,
                 is_taken_tx,
             } => {
+                info!("received login");
+
                 let is_nickname_taken = !taken_nicknames.insert(nickname);
+
+                if is_nickname_taken {
+                    info!("nickname was taken");
+                } else {
+                    info!("nickname was not taken");
+                }
+
                 is_taken_tx.send(is_nickname_taken).unwrap();
             }
 
             NicknameEvent::Logout { nickname } => {
+                info!("received logout");
+
                 let was_taken = taken_nicknames.remove(&nickname);
 
                 // panic if the nickname we were told is logging out

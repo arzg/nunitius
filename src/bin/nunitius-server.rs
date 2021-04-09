@@ -11,11 +11,11 @@ fn main() -> anyhow::Result<()> {
 
     let (sender_tx, sender_rx) = flume::bounded(100);
     let (viewer_tx, viewer_rx) = flume::bounded(100);
-    let (events_tx, events_rx) = flume::bounded(100);
+    let (event_tx, event_rx) = flume::bounded(100);
     let (nickname_event_tx, nickname_event_rx) = flume::bounded(100);
 
-    thread::spawn(|| nunitius::server::sender_handler(sender_rx, nickname_event_tx, events_tx));
-    thread::spawn(|| nunitius::server::viewer_handler(events_rx, viewer_rx));
+    thread::spawn(|| nunitius::server::sender_handler(sender_rx, nickname_event_tx, event_tx));
+    thread::spawn(|| nunitius::server::viewer_handler(event_rx, viewer_rx));
     thread::spawn(|| nunitius::server::nickname_handler(nickname_event_rx));
 
     for stream in listener.incoming() {

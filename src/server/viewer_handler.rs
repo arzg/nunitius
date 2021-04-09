@@ -6,7 +6,7 @@ use std::io;
 use std::net::TcpStream;
 use tracing::{error, info, span, Level};
 
-pub fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
+pub fn viewer_handler(event_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
     let span = span!(Level::INFO, "handling_viewers");
     let _guard = span.enter();
 
@@ -19,7 +19,7 @@ pub fn viewer_handler(events_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>
                 info!("received new viewer");
                 handle_new_viewer(&viewers, &mut current_viewer_idx, viewer.unwrap());
             })
-            .recv(&events_rx, |event| {
+            .recv(&event_rx, |event| {
                 info!("received event");
                 handle_new_event(&viewers, event.unwrap());
             })
@@ -38,11 +38,11 @@ fn handle_new_viewer(
 
 fn handle_new_event(viewers: &RefCell<HashMap<i32, TcpStream>>, event: Event) {
     let mut closed_viewers = Vec::new();
-    send_events_to_viewers(viewers, event, &mut closed_viewers);
+    send_event_to_viewers(viewers, event, &mut closed_viewers);
     remove_closed_viewers(viewers, closed_viewers.into_iter());
 }
 
-fn send_events_to_viewers(
+fn send_event_to_viewers(
     viewers: &RefCell<HashMap<i32, TcpStream>>,
     event: Event,
     closed_viewers: &mut Vec<i32>,

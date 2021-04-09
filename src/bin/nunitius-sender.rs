@@ -38,7 +38,7 @@ fn login(
     stdin: &io::Stdin,
     stdout: &mut io::Stdout,
     connection: &mut TcpConnection,
-) -> Result<String, anyhow::Error> {
+) -> anyhow::Result<String> {
     loop {
         let nickname = read_input("Choose a nickname", stdin, stdout)?;
 

@@ -1,9 +1,9 @@
 use super::NicknameEvent;
 use crate::{Event, Login, LoginResponse};
 use flume::{Receiver, Sender};
+use log::{error, info};
 use std::net::TcpStream;
 use std::{io, thread};
-use tracing::{error, info};
 
 pub fn sender_handler(
     sender_rx: Receiver<TcpStream>,
@@ -62,7 +62,7 @@ fn log_sender_in(
 ) -> anyhow::Result<String> {
     loop {
         let login: Login = connection.read()?;
-        info!(?login, "read login from sender");
+        info!("read login from sender: {:?}", login);
 
         let is_nickname_taken =
             check_if_nickname_is_taken(login.nickname.clone(), nickname_event_tx)?;

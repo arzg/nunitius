@@ -1,11 +1,20 @@
+use log::error;
 use std::net::TcpListener;
 use std::thread;
-use tracing::{error, Level};
 
 fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::TRACE)
-        .init();
+    fern::Dispatch::new()
+        .level(log::LevelFilter::Trace)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.level(),
+                record.target(),
+                message,
+            ))
+        })
+        .chain(std::io::stdout())
+        .apply()?;
 
     let listener = TcpListener::bind("127.0.0.1:9999")?;
 

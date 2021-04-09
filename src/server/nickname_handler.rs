@@ -1,12 +1,9 @@
 use super::NicknameEvent;
 use flume::{Receiver, Sender};
+use log::info;
 use std::collections::HashSet;
-use tracing::{info, span, Level};
 
 pub fn nickname_handler(nickname_event_rx: Receiver<NicknameEvent>) {
-    let span = span!(Level::INFO, "handling_nicknames");
-    let _guard = span.enter();
-
     let mut taken_nicknames = HashSet::new();
 
     for nickname_event in nickname_event_rx {

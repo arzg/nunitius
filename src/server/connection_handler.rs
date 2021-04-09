@@ -1,8 +1,8 @@
 use crate::ConnectionKind;
 use flume::Sender;
+use log::info;
 use std::io;
 use std::net::TcpStream;
-use tracing::info;
 
 pub fn handle_connection(
     stream: TcpStream,
@@ -13,7 +13,7 @@ pub fn handle_connection(
     let connection_kind = jsonl::read(&mut stream)?;
     let stream = stream.into_inner();
 
-    info!(?connection_kind);
+    info!("connection kind: {:?}", connection_kind);
 
     match connection_kind {
         ConnectionKind::Sender => sender_tx.send(stream).unwrap(),

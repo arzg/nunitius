@@ -1,15 +1,12 @@
 use crate::Event;
 use flume::{Receiver, Selector};
+use log::{error, info};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io;
 use std::net::TcpStream;
-use tracing::{error, info, span, Level};
 
 pub fn viewer_handler(event_rx: Receiver<Event>, viewer_rx: Receiver<TcpStream>) {
-    let span = span!(Level::INFO, "handling_viewers");
-    let _guard = span.enter();
-
     let viewers = RefCell::new(HashMap::new());
     let mut current_viewer_idx = 0;
 

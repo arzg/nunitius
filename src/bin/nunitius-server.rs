@@ -7,9 +7,9 @@ fn main() -> anyhow::Result<()> {
         .level(log::LevelFilter::Trace)
         .format(|out, message, record| {
             out.finish(format_args!(
-                "[{}][{}] {}",
-                record.level(),
-                record.target(),
+                "{:<7} {:<40} {}",
+                format!("[{}]", record.level()),
+                format!("[{}]", record.target()),
                 message,
             ))
         })

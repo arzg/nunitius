@@ -7,7 +7,12 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0"
 fern = "0.6.0"
-flume = "0.10.2"
+
 jsonl = "4.0"
 log = "0.4.0"
 serde = {version = "1.0", features = ["derive"]}
+
+[dependencies.flume]
+default_features = false
+features = ["select"]
+version = "0.10.3"

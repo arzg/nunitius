@@ -1,3 +1,4 @@
+use flume::{Receiver, Sender};
 use log::error;
 use std::net::TcpListener;
 use std::thread;
@@ -20,12 +21,28 @@ fn main() -> anyhow::Result<()> {
 
     let (sender_tx, sender_rx) = flume::bounded(100);
     let (viewer_tx, viewer_rx) = flume::bounded(100);
-    let (event_tx, event_rx) = flume::bounded(100);
     let (nickname_event_tx, nickname_event_rx) = flume::bounded(100);
+    let (history_request_tx, history_request_rx) = flume::bounded(100);
+
+    let (event_tx, event_rx) = flume::bounded(100);
+    let (viewer_handler_event_tx, viewer_handler_event_rx) = flume::bounded(100);
+    let (history_handler_event_tx, history_handler_event_rx) = flume::bounded(100);
 
     thread::spawn(|| nunitius::server::sender_handler(sender_rx, nickname_event_tx, event_tx));
-    thread::spawn(|| nunitius::server::viewer_handler(event_rx, viewer_rx));
+    thread::spawn(|| {
+        nunitius::server::viewer_handler(viewer_rx, viewer_handler_event_rx, history_request_tx)
+    });
     thread::spawn(|| nunitius::server::nickname_handler(nickname_event_rx));
+    thread::spawn(|| {
+        nunitius::server::history_handler(history_handler_event_rx, history_request_rx)
+    });
+
+    thread::spawn(|| {
+        fanout(
+            event_rx,
+            &[viewer_handler_event_tx, history_handler_event_tx],
+        )
+    });
 
     for stream in listener.incoming() {
         let stream = stream?;
@@ -38,4 +55,12 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn fanout<T: Clone>(rx: Receiver<T>, txs: &[Sender<T>]) {
+    for t in rx {
+        for tx in txs {
+            tx.send(t.clone()).unwrap();
+        }
+    }
 }

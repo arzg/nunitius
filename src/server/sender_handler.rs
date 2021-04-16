@@ -1,5 +1,5 @@
 use super::NicknameEvent;
-use crate::{Event, Login, LoginResponse};
+use crate::{Event, LoginResponse, User};
 use flume::{Receiver, Sender};
 use log::{error, info};
 use std::net::TcpStream;
@@ -29,7 +29,7 @@ fn handle_sender(
     event_tx: Sender<Event>,
 ) -> anyhow::Result<()> {
     let mut connection = jsonl::Connection::new_from_tcp_stream(stream)?;
-    let nickname = log_sender_in(&mut connection, &nickname_event_tx, &event_tx)?;
+    let user = log_sender_in(&mut connection, &nickname_event_tx, &event_tx)?;
 
     loop {
         match connection.read() {
@@ -43,11 +43,11 @@ fn handle_sender(
 
                 nickname_event_tx
                     .send(NicknameEvent::Logout {
-                        nickname: nickname.clone(),
+                        nickname: user.nickname.clone(),
                     })
                     .unwrap();
 
-                event_tx.send(Event::Logout { nickname }).unwrap();
+                event_tx.send(Event::Logout(user)).unwrap();
 
                 break;
             }
@@ -63,13 +63,13 @@ fn log_sender_in(
     connection: &mut TcpConnection,
     nickname_event_tx: &Sender<NicknameEvent>,
     event_tx: &Sender<Event>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<User> {
     loop {
-        let login: Login = connection.read()?;
-        info!("read login from sender: {:?}", login);
+        let user: User = connection.read()?;
+        info!("read user from sender: {:?}", user);
 
         let is_nickname_taken =
-            check_if_nickname_is_taken(login.nickname.clone(), nickname_event_tx)?;
+            check_if_nickname_is_taken(user.nickname.clone(), nickname_event_tx)?;
 
         connection.write(&LoginResponse {
             nickname_taken: is_nickname_taken,
@@ -79,9 +79,9 @@ fn log_sender_in(
             info!("nickname was taken, retrying");
         } else {
             info!("logged in with unique nickname");
-            event_tx.send(Event::Login(login.clone())).unwrap();
+            event_tx.send(Event::Login(user.clone())).unwrap();
 
-            return Ok(login.nickname);
+            return Ok(user);
         }
     }
 }

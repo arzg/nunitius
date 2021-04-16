@@ -1,4 +1,6 @@
-use nunitius::{ConnectionKind, Event, Login, Message};
+use ansi_term::{Color as AnsiColor, Style};
+use core::fmt;
+use nunitius::{Color, ConnectionKind, Event, Message, User};
 use std::io::BufReader;
 use std::net::TcpStream;
 
@@ -23,8 +25,24 @@ fn main() -> anyhow::Result<()> {
 
 fn display_event(event: Event) {
     match event {
-        Event::Message(Message { body, author }) => println!("{}: {}", author, body),
-        Event::Login(Login { nickname }) => println!("Login with nickname {}", nickname),
-        Event::Logout { nickname } => println!("{} logged out!", nickname),
+        Event::Message(Message { body, author }) => println!("{}: {}", format_user(author), body),
+        Event::Login(user) => println!("{} logged in!", format_user(user)),
+        Event::Logout(user) => println!("{} logged out!", format_user(user)),
     }
+}
+
+fn format_user(user: User) -> impl fmt::Display {
+    let style = Style::new().bold();
+
+    let style = match user.color {
+        Some(Color::Red) => style.fg(AnsiColor::Red),
+        Some(Color::Green) => style.fg(AnsiColor::Green),
+        Some(Color::Yellow) => style.fg(AnsiColor::Yellow),
+        Some(Color::Blue) => style.fg(AnsiColor::Blue),
+        Some(Color::Purple) => style.fg(AnsiColor::Purple),
+        Some(Color::Cyan) => style.fg(AnsiColor::Cyan),
+        None => style,
+    };
+
+    style.paint(user.nickname)
 }

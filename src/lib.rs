@@ -5,19 +5,30 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
     Message(Message),
-    Login(Login),
-    Logout { nickname: String },
+    Login(User),
+    Logout(User),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub body: String,
-    pub author: String,
+    pub author: User,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Login {
+pub struct User {
     pub nickname: String,
+    pub color: Option<Color>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Color {
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Purple,
+    Cyan,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

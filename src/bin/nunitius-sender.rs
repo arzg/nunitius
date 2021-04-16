@@ -1,5 +1,5 @@
 use jsonl::Connection;
-use nunitius::{ConnectionKind, Login, LoginResponse, Message};
+use nunitius::{Color, ConnectionKind, LoginResponse, Message, User};
 use std::io::{self, Write};
 use std::net::TcpStream;
 
@@ -38,7 +38,7 @@ fn login(
     stdin: &io::Stdin,
     stdout: &mut io::Stdout,
     connection: &mut TcpConnection,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<User> {
     loop {
         let nickname = read_input("Choose a nickname", stdin, stdout)?;
 
@@ -48,18 +48,45 @@ fn login(
             continue;
         };
 
-        let login = Login {
+        let user = User {
             nickname: nickname.clone(),
+            color: read_color(stdin, stdout)?,
         };
-        connection.write(&login)?;
+
+        connection.write(&user)?;
 
         let response: LoginResponse = connection.read()?;
 
         if response.nickname_taken {
             eprintln!("Nickname ‘{}’ taken. Try another one.", nickname);
         } else {
-            return Ok(nickname);
+            return Ok(user);
         }
+    }
+}
+
+fn read_color(stdin: &io::Stdin, stdout: &mut io::Stdout) -> anyhow::Result<Option<Color>> {
+    loop {
+        let color = if let Some(s) = read_input("Choose a color", stdin, stdout)? {
+            s
+        } else {
+            return Ok(None);
+        };
+
+        let color = match color.as_str() {
+            "red" => Color::Red,
+            "green" => Color::Green,
+            "yellow" => Color::Yellow,
+            "blue" => Color::Blue,
+            "purple" => Color::Purple,
+            "cyan" => Color::Cyan,
+            _ => {
+                eprintln!("‘{}’ is an invalid color.", color);
+                continue;
+            }
+        };
+
+        return Ok(Some(color));
     }
 }
 

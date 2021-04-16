@@ -5,9 +5,9 @@ name = "nunitius"
 version = "0.1.0"
 
 [dependencies]
+ansi_term = "0.12.1"
 anyhow = "1.0"
 fern = "0.6.0"
-
 jsonl = "4.0"
 log = "0.4.0"
 serde = {version = "1.0", features = ["derive"]}

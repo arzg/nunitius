@@ -42,8 +42,12 @@ fn handle_sender(
                 info!("logged out");
 
                 nickname_event_tx
-                    .send(NicknameEvent::Logout { nickname })
+                    .send(NicknameEvent::Logout {
+                        nickname: nickname.clone(),
+                    })
                     .unwrap();
+
+                event_tx.send(Event::Logout { nickname }).unwrap();
 
                 break;
             }

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum Event {
     Message(Message),
     Login(Login),
+    Logout { nickname: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

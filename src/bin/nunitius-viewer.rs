@@ -25,5 +25,6 @@ fn display_event(event: Event) {
     match event {
         Event::Message(Message { body, author }) => println!("{}: {}", author, body),
         Event::Login(Login { nickname }) => println!("Login with nickname {}", nickname),
+        Event::Logout { nickname } => println!("{} logged out!", nickname),
     }
 }

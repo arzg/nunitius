@@ -1,10 +1,12 @@
-use ansi_term::{Color as AnsiColor, Style};
-use core::fmt;
+use crossterm::style::{self, style, Styler};
 use nunitius::{Color, ConnectionKind, Event, Message, User};
+use std::fmt;
 use std::io::BufReader;
+use std::io::{self, Write};
 use std::net::TcpStream;
 
 fn main() -> anyhow::Result<()> {
+    let mut stdout = io::stdout();
     let mut stream = TcpStream::connect("127.0.0.1:9999")?;
 
     jsonl::write(&mut stream, &ConnectionKind::Viewer)?;
@@ -14,35 +16,42 @@ fn main() -> anyhow::Result<()> {
     let existing_events: Vec<_> = jsonl::read(&mut stream)?;
 
     for event in existing_events {
-        display_event(event);
+        display_event(event, &mut stdout)?;
     }
 
     loop {
         let event = jsonl::read(&mut stream)?;
-        display_event(event);
+        display_event(event, &mut stdout)?;
     }
 }
 
-fn display_event(event: Event) {
+fn display_event(event: Event, stdout: &mut io::Stdout) -> anyhow::Result<()> {
     match event {
-        Event::Message(Message { body, author }) => println!("{}: {}", format_user(author), body),
-        Event::Login(user) => println!("{} logged in!", format_user(user)),
-        Event::Logout(user) => println!("{} logged out!", format_user(user)),
+        Event::Message(Message { body, author }) => {
+            writeln!(stdout, "{}: {}", display_user(author), body)?
+        }
+        Event::Login(user) => writeln!(stdout, "{} logged in!", display_user(user))?,
+        Event::Logout(user) => writeln!(stdout, "{} logged out!", display_user(user))?,
     }
+
+    Ok(())
 }
 
-fn format_user(user: User) -> impl fmt::Display {
-    let style = Style::new().bold();
+fn display_user(user: User) -> impl fmt::Display {
+    let base_styled_content = style(user.nickname).bold();
 
-    let style = match user.color {
-        Some(Color::Red) => style.fg(AnsiColor::Red),
-        Some(Color::Green) => style.fg(AnsiColor::Green),
-        Some(Color::Yellow) => style.fg(AnsiColor::Yellow),
-        Some(Color::Blue) => style.fg(AnsiColor::Blue),
-        Some(Color::Purple) => style.fg(AnsiColor::Purple),
-        Some(Color::Cyan) => style.fg(AnsiColor::Cyan),
-        None => style,
-    };
+    if let Some(color) = user.color {
+        let color = match color {
+            Color::Red => style::Color::Red,
+            Color::Green => style::Color::Green,
+            Color::Yellow => style::Color::Yellow,
+            Color::Blue => style::Color::Blue,
+            Color::Magenta => style::Color::Magenta,
+            Color::Cyan => style::Color::Cyan,
+        };
 
-    style.paint(user.nickname)
+        base_styled_content.with(color)
+    } else {
+        base_styled_content
+    }
 }

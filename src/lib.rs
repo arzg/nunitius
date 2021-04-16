@@ -27,7 +27,7 @@ pub enum Color {
     Green,
     Yellow,
     Blue,
-    Purple,
+    Magenta,
     Cyan,
 }
 

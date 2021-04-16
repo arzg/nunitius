@@ -78,7 +78,7 @@ fn read_color(stdin: &io::Stdin, stdout: &mut io::Stdout) -> anyhow::Result<Opti
             "green" => Color::Green,
             "yellow" => Color::Yellow,
             "blue" => Color::Blue,
-            "purple" => Color::Purple,
+            "magenta" => Color::Magenta,
             "cyan" => Color::Cyan,
             _ => {
                 eprintln!("‘{}’ is an invalid color.", color);

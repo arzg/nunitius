@@ -1,5 +1,6 @@
 use super::NicknameEvent;
 use crate::{Event, EventKind, Login, LoginResponse, SenderEvent, User};
+use chrono::Utc;
 use flume::{Receiver, Sender};
 use log::{error, info};
 use std::net::TcpStream;
@@ -30,6 +31,7 @@ fn handle_sender(
 ) -> anyhow::Result<()> {
     let mut connection = jsonl::Connection::new_from_tcp_stream(stream)?;
     let user = log_sender_in(&mut connection, &nickname_event_tx, &event_tx)?;
+    let time_occurred = Utc::now();
 
     loop {
         match connection.read() {
@@ -49,6 +51,7 @@ fn handle_sender(
                     .send(Event {
                         event,
                         user: user.clone(),
+                        time_occurred,
                     })
                     .unwrap();
             }
@@ -66,6 +69,7 @@ fn handle_sender(
                     .send(Event {
                         event: EventKind::Logout,
                         user,
+                        time_occurred,
                     })
                     .unwrap();
 
@@ -99,10 +103,12 @@ fn log_sender_in(
             info!("nickname was taken, retrying");
         } else {
             info!("logged in with unique nickname");
+
             event_tx
                 .send(Event {
                     event: EventKind::Login,
                     user: login.user.clone(),
+                    time_occurred: Utc::now(),
                 })
                 .unwrap();
 

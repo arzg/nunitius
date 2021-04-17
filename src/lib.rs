@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Event {
     pub event: EventKind,
     pub user: User,
+    pub time_occurred: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +34,6 @@ pub enum TypingEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub body: String,
-    pub time_sent: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

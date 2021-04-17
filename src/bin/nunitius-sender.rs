@@ -1,4 +1,3 @@
-use chrono::Utc;
 use crossterm::{cursor, execute, terminal};
 use jsonl::Connection;
 use nunitius::sender::ui;
@@ -50,12 +49,9 @@ fn main() -> anyhow::Result<()> {
             continue;
         };
 
-        let message = Message {
-            body: input,
-            time_sent: Utc::now(),
-        };
-
-        sender_event_tx.send(SenderEvent::Message(message)).unwrap();
+        sender_event_tx
+            .send(SenderEvent::Message(Message { body: input }))
+            .unwrap();
 
         execute!(
             stdout,

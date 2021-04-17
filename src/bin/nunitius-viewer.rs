@@ -26,20 +26,22 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn display_event(Event { event, user }: Event, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+fn display_event(
+    Event {
+        event,
+        user,
+        time_occurred,
+    }: Event,
+    stdout: &mut io::Stdout,
+) -> anyhow::Result<()> {
     let user = format_user(user);
 
-    match event {
-        EventKind::Message(Message { body, time_sent }) => {
-            let local_time_sent = time_sent.with_timezone(&Local);
+    let local_time_occurred = time_occurred.with_timezone(&Local);
+    write!(stdout, "[{}] ", local_time_occurred.format("%H:%M"))?;
 
-            writeln!(
-                stdout,
-                "[{}] {}: {}",
-                local_time_sent.format("%H:%M"),
-                user,
-                body,
-            )?;
+    match event {
+        EventKind::Message(Message { body }) => {
+            writeln!(stdout, "{}: {}", user, body)?;
         }
         EventKind::Login => writeln!(stdout, "{} logged in!", user)?,
         EventKind::Logout => writeln!(stdout, "{} logged out!", user)?,

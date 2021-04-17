@@ -1,6 +1,7 @@
 pub mod sender;
 pub mod server;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +33,7 @@ pub enum TypingEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub body: String,
+    pub time_sent: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

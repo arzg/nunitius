@@ -1,3 +1,4 @@
+use chrono::Local;
 use crossterm::style::{self, style, Styler};
 use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
 use std::fmt;
@@ -29,7 +30,17 @@ fn display_event(Event { event, user }: Event, stdout: &mut io::Stdout) -> anyho
     let user = format_user(user);
 
     match event {
-        EventKind::Message(Message { body }) => writeln!(stdout, "{}: {}", user, body)?,
+        EventKind::Message(Message { body, time_sent }) => {
+            let local_time_sent = time_sent.with_timezone(&Local);
+
+            writeln!(
+                stdout,
+                "[{}] {}: {}",
+                local_time_sent.format("%H:%M"),
+                user,
+                body,
+            )?;
+        }
         EventKind::Login => writeln!(stdout, "{} logged in!", user)?,
         EventKind::Logout => writeln!(stdout, "{} logged out!", user)?,
         EventKind::Typing(event) => match event {

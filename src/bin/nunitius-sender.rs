@@ -2,20 +2,22 @@ use crossterm::{cursor, execute, terminal};
 use jsonl::Connection;
 use nunitius::sender::ui;
 use nunitius::{Color, ConnectionKind, Login, LoginResponse, Message, SenderEvent, User};
+use std::io::{self, Write};
 use std::net::TcpStream;
-use std::{io, thread};
+use std::thread;
 
 type TcpConnection = Connection<io::BufReader<TcpStream>, TcpStream>;
 
 fn main() -> anyhow::Result<()> {
     let mut stdout = io::stdout();
+    let mut stderr = io::stderr();
 
     let stream = TcpStream::connect("127.0.0.1:9999")?;
     let mut connection = Connection::new_from_tcp_stream(stream)?;
 
     connection.write(&ConnectionKind::Sender)?;
 
-    login(&mut stdout, &mut connection)?;
+    login(&mut connection, &mut stdout, &mut stderr)?;
 
     let (typing_event_tx, typing_event_rx) = flume::bounded(100);
     let (sender_event_tx, sender_event_rx) = flume::bounded(100);
@@ -59,7 +61,11 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Result<()> {
+fn login(
+    connection: &mut TcpConnection,
+    stdout: &mut io::Stdout,
+    stderr: &mut io::Stderr,
+) -> anyhow::Result<()> {
     loop {
         let nickname = ui::read_input("Choose a nickname", stdout)?;
 
@@ -71,7 +77,7 @@ fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Res
 
         let user = User {
             nickname: nickname.clone(),
-            color: read_color(stdout)?,
+            color: read_color(stdout, stderr)?,
         };
 
         connection.write(&Login { user })?;
@@ -79,14 +85,14 @@ fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Res
         let response: LoginResponse = connection.read()?;
 
         if response.nickname_taken {
-            eprintln!("Nickname ‘{}’ taken. Try another one.", nickname);
+            writeln!(stderr, "Nickname ‘{}’ taken. Try another one.", nickname)?;
         } else {
             return Ok(());
         }
     }
 }
 
-fn read_color(stdout: &mut io::Stdout) -> anyhow::Result<Option<Color>> {
+fn read_color(stdout: &mut io::Stdout, stderr: &mut io::Stderr) -> anyhow::Result<Option<Color>> {
     loop {
         let color = if let Some(s) = ui::read_input("Choose a color", stdout)? {
             s
@@ -102,7 +108,7 @@ fn read_color(stdout: &mut io::Stdout) -> anyhow::Result<Option<Color>> {
             "magenta" => Color::Magenta,
             "cyan" => Color::Cyan,
             _ => {
-                eprintln!("‘{}’ is an invalid color.", color);
+                writeln!(stderr, "‘{}’ is an invalid color.", color)?;
                 continue;
             }
         };

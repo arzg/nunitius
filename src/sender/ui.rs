@@ -84,7 +84,7 @@ pub fn read_input_evented(
     }
 
     terminal::disable_raw_mode()?;
-    println!();
+    writeln!(stdout)?;
 
     let s = edit_buffer.to_string();
     let s = s.trim().to_string();

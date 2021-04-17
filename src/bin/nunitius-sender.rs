@@ -1,3 +1,4 @@
+use crossterm::{cursor, execute, terminal};
 use jsonl::Connection;
 use nunitius::sender::ui;
 use nunitius::{Color, ConnectionKind, Login, LoginResponse, Message, SenderEvent, User};
@@ -49,6 +50,12 @@ fn main() -> anyhow::Result<()> {
         let message = Message { body: input };
 
         sender_event_tx.send(SenderEvent::Message(message)).unwrap();
+
+        execute!(
+            stdout,
+            cursor::MoveUp(1),
+            terminal::Clear(terminal::ClearType::CurrentLine),
+        )?;
     }
 }
 

@@ -1,3 +1,4 @@
+pub mod sender;
 pub mod server;
 
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,19 @@ pub enum Event {
     Message(Message),
     Login(User),
     Logout(User),
+    Typing { event: TypingEvent, user: User },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SenderEvent {
+    Message(Message),
+    Typing { event: TypingEvent, user: User },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum TypingEvent {
+    Start,
+    Stop,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

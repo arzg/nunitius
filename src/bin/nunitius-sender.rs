@@ -1,12 +1,12 @@
 use jsonl::Connection;
-use nunitius::{Color, ConnectionKind, LoginResponse, Message, User};
-use std::io::{self, Write};
+use nunitius::sender::ui;
+use nunitius::{Color, ConnectionKind, LoginResponse, Message, SenderEvent, User};
 use std::net::TcpStream;
+use std::{io, thread};
 
 type TcpConnection = Connection<io::BufReader<TcpStream>, TcpStream>;
 
 fn main() -> anyhow::Result<()> {
-    let stdin = io::stdin();
     let mut stdout = io::stdout();
 
     let stream = TcpStream::connect("127.0.0.1:9999")?;
@@ -14,10 +14,35 @@ fn main() -> anyhow::Result<()> {
 
     connection.write(&ConnectionKind::Sender)?;
 
-    let nickname = login(&stdin, &mut stdout, &mut connection)?;
+    let user = login(&mut stdout, &mut connection)?;
+
+    let (typing_event_tx, typing_event_rx) = flume::bounded(100);
+    let (sender_event_tx, sender_event_rx) = flume::bounded(100);
+
+    thread::spawn({
+        let sender_event_tx = sender_event_tx.clone();
+        let user = user.clone();
+
+        move || {
+            for typing_event in typing_event_rx {
+                sender_event_tx
+                    .send(SenderEvent::Typing {
+                        event: typing_event,
+                        user: user.clone(),
+                    })
+                    .unwrap();
+            }
+        }
+    });
+
+    thread::spawn(move || {
+        for sender_event in sender_event_rx {
+            connection.write(&sender_event).unwrap();
+        }
+    });
 
     loop {
-        let input = read_input("Type a message", &stdin, &mut stdout)?;
+        let input = ui::read_input_evented("Type a message", &mut stdout, typing_event_tx.clone())?;
 
         let input = if let Some(i) = input {
             i
@@ -27,20 +52,16 @@ fn main() -> anyhow::Result<()> {
 
         let message = Message {
             body: input,
-            author: nickname.clone(),
+            author: user.clone(),
         };
 
-        connection.write(&message)?;
+        sender_event_tx.send(SenderEvent::Message(message)).unwrap();
     }
 }
 
-fn login(
-    stdin: &io::Stdin,
-    stdout: &mut io::Stdout,
-    connection: &mut TcpConnection,
-) -> anyhow::Result<User> {
+fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Result<User> {
     loop {
-        let nickname = read_input("Choose a nickname", stdin, stdout)?;
+        let nickname = ui::read_input("Choose a nickname", stdout)?;
 
         let nickname = if let Some(n) = nickname {
             n
@@ -50,7 +71,7 @@ fn login(
 
         let user = User {
             nickname: nickname.clone(),
-            color: read_color(stdin, stdout)?,
+            color: read_color(stdout)?,
         };
 
         connection.write(&user)?;
@@ -65,9 +86,9 @@ fn login(
     }
 }
 
-fn read_color(stdin: &io::Stdin, stdout: &mut io::Stdout) -> anyhow::Result<Option<Color>> {
+fn read_color(stdout: &mut io::Stdout) -> anyhow::Result<Option<Color>> {
     loop {
-        let color = if let Some(s) = read_input("Choose a color", stdin, stdout)? {
+        let color = if let Some(s) = ui::read_input("Choose a color", stdout)? {
             s
         } else {
             return Ok(None);
@@ -88,20 +109,4 @@ fn read_color(stdin: &io::Stdin, stdout: &mut io::Stdout) -> anyhow::Result<Opti
 
         return Ok(Some(color));
     }
-}
-
-fn read_input(
-    prompt: &str,
-    stdin: &io::Stdin,
-    stdout: &mut io::Stdout,
-) -> anyhow::Result<Option<String>> {
-    write!(stdout, "{} > ", prompt)?;
-    stdout.flush()?;
-
-    let mut input = String::new();
-    stdin.read_line(&mut input)?;
-
-    let input = input.trim().to_string();
-
-    Ok(if input.is_empty() { None } else { Some(input) })
 }

@@ -1,5 +1,5 @@
 use super::NicknameEvent;
-use crate::{Event, LoginResponse, User};
+use crate::{Event, LoginResponse, SenderEvent, User};
 use flume::{Receiver, Sender};
 use log::{error, info};
 use std::net::TcpStream;
@@ -33,9 +33,18 @@ fn handle_sender(
 
     loop {
         match connection.read() {
-            Ok(message) => {
-                info!("received message");
-                event_tx.send(Event::Message(message)).unwrap();
+            Ok(sender_event) => {
+                let event = match sender_event {
+                    SenderEvent::Message(message) => {
+                        info!("received message");
+                        Event::Message(message)
+                    }
+                    SenderEvent::Typing { event, user } => {
+                        info!("received typing event");
+                        Event::Typing { event, user }
+                    }
+                };
+                event_tx.send(event).unwrap();
             }
 
             Err(jsonl::ReadError::Eof) => {

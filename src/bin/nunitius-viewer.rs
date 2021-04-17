@@ -1,5 +1,5 @@
 use crossterm::style::{self, style, Styler};
-use nunitius::{Color, ConnectionKind, Event, Message, TypingEvent, User};
+use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
 use std::fmt;
 use std::io::BufReader;
 use std::io::{self, Write};
@@ -25,23 +25,23 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn display_event(event: Event, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+fn display_event(Event { event, user }: Event, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+    let user = format_user(user);
+
     match event {
-        Event::Message(Message { body, author }) => {
-            writeln!(stdout, "{}: {}", display_user(author), body)?
-        }
-        Event::Login(user) => writeln!(stdout, "{} logged in!", display_user(user))?,
-        Event::Logout(user) => writeln!(stdout, "{} logged out!", display_user(user))?,
-        Event::Typing { event, user } => match event {
-            TypingEvent::Start => writeln!(stdout, "{} started typing...", display_user(user))?,
-            TypingEvent::Stop => writeln!(stdout, "{} stopped typing...", display_user(user))?,
+        EventKind::Message(Message { body }) => writeln!(stdout, "{}: {}", user, body)?,
+        EventKind::Login => writeln!(stdout, "{} logged in!", user)?,
+        EventKind::Logout => writeln!(stdout, "{} logged out!", user)?,
+        EventKind::Typing(event) => match event {
+            TypingEvent::Start => writeln!(stdout, "{} started typing...", user)?,
+            TypingEvent::Stop => writeln!(stdout, "{} stopped typing...", user)?,
         },
     }
 
     Ok(())
 }
 
-fn display_user(user: User) -> impl fmt::Display {
+fn format_user(user: User) -> impl fmt::Display {
     let base_styled_content = style(user.nickname).bold();
 
     if let Some(color) = user.color {

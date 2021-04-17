@@ -1,6 +1,6 @@
 use jsonl::Connection;
 use nunitius::sender::ui;
-use nunitius::{Color, ConnectionKind, LoginResponse, Message, SenderEvent, User};
+use nunitius::{Color, ConnectionKind, Login, LoginResponse, Message, SenderEvent, User};
 use std::net::TcpStream;
 use std::{io, thread};
 
@@ -14,22 +14,18 @@ fn main() -> anyhow::Result<()> {
 
     connection.write(&ConnectionKind::Sender)?;
 
-    let user = login(&mut stdout, &mut connection)?;
+    login(&mut stdout, &mut connection)?;
 
     let (typing_event_tx, typing_event_rx) = flume::bounded(100);
     let (sender_event_tx, sender_event_rx) = flume::bounded(100);
 
     thread::spawn({
         let sender_event_tx = sender_event_tx.clone();
-        let user = user.clone();
 
         move || {
             for typing_event in typing_event_rx {
                 sender_event_tx
-                    .send(SenderEvent::Typing {
-                        event: typing_event,
-                        user: user.clone(),
-                    })
+                    .send(SenderEvent::Typing(typing_event))
                     .unwrap();
             }
         }
@@ -50,16 +46,13 @@ fn main() -> anyhow::Result<()> {
             continue;
         };
 
-        let message = Message {
-            body: input,
-            author: user.clone(),
-        };
+        let message = Message { body: input };
 
         sender_event_tx.send(SenderEvent::Message(message)).unwrap();
     }
 }
 
-fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Result<User> {
+fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Result<()> {
     loop {
         let nickname = ui::read_input("Choose a nickname", stdout)?;
 
@@ -74,14 +67,14 @@ fn login(stdout: &mut io::Stdout, connection: &mut TcpConnection) -> anyhow::Res
             color: read_color(stdout)?,
         };
 
-        connection.write(&user)?;
+        connection.write(&Login { user })?;
 
         let response: LoginResponse = connection.read()?;
 
         if response.nickname_taken {
             eprintln!("Nickname ‘{}’ taken. Try another one.", nickname);
         } else {
-            return Ok(user);
+            return Ok(());
         }
     }
 }

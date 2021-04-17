@@ -1,5 +1,5 @@
 use super::NicknameEvent;
-use crate::{Event, LoginResponse, SenderEvent, User};
+use crate::{Event, EventKind, Login, LoginResponse, SenderEvent, User};
 use flume::{Receiver, Sender};
 use log::{error, info};
 use std::net::TcpStream;
@@ -37,14 +37,20 @@ fn handle_sender(
                 let event = match sender_event {
                     SenderEvent::Message(message) => {
                         info!("received message");
-                        Event::Message(message)
+                        EventKind::Message(message)
                     }
-                    SenderEvent::Typing { event, user } => {
+                    SenderEvent::Typing(event) => {
                         info!("received typing event");
-                        Event::Typing { event, user }
+                        EventKind::Typing(event)
                     }
                 };
-                event_tx.send(event).unwrap();
+
+                event_tx
+                    .send(Event {
+                        event,
+                        user: user.clone(),
+                    })
+                    .unwrap();
             }
 
             Err(jsonl::ReadError::Eof) => {
@@ -56,7 +62,12 @@ fn handle_sender(
                     })
                     .unwrap();
 
-                event_tx.send(Event::Logout(user)).unwrap();
+                event_tx
+                    .send(Event {
+                        event: EventKind::Logout,
+                        user,
+                    })
+                    .unwrap();
 
                 break;
             }
@@ -74,11 +85,11 @@ fn log_sender_in(
     event_tx: &Sender<Event>,
 ) -> anyhow::Result<User> {
     loop {
-        let user: User = connection.read()?;
-        info!("read user from sender: {:?}", user);
+        let login: Login = connection.read()?;
+        info!("read login from sender: {:?}", login);
 
         let is_nickname_taken =
-            check_if_nickname_is_taken(user.nickname.clone(), nickname_event_tx)?;
+            check_if_nickname_is_taken(login.user.nickname.clone(), nickname_event_tx)?;
 
         connection.write(&LoginResponse {
             nickname_taken: is_nickname_taken,
@@ -88,9 +99,14 @@ fn log_sender_in(
             info!("nickname was taken, retrying");
         } else {
             info!("logged in with unique nickname");
-            event_tx.send(Event::Login(user.clone())).unwrap();
+            event_tx
+                .send(Event {
+                    event: EventKind::Login,
+                    user: login.user.clone(),
+                })
+                .unwrap();
 
-            return Ok(user);
+            return Ok(login.user);
         }
     }
 }

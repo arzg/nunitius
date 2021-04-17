@@ -4,17 +4,23 @@ pub mod server;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Event {
+pub struct Event {
+    pub event: EventKind,
+    pub user: User,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EventKind {
     Message(Message),
-    Login(User),
-    Logout(User),
-    Typing { event: TypingEvent, user: User },
+    Login,
+    Logout,
+    Typing(TypingEvent),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SenderEvent {
     Message(Message),
-    Typing { event: TypingEvent, user: User },
+    Typing(TypingEvent),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -26,7 +32,11 @@ pub enum TypingEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub body: String,
-    pub author: User,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Login {
+    pub user: User,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

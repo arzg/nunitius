@@ -1,5 +1,6 @@
 use chrono::Local;
 use crossterm::style::{self, style, Styler};
+use crossterm::{cursor, queue, terminal};
 use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
 use std::fmt;
 use std::io::BufReader;
@@ -14,15 +15,22 @@ fn main() -> anyhow::Result<()> {
 
     let mut stream = BufReader::new(stream);
 
-    let existing_events: Vec<_> = jsonl::read(&mut stream)?;
-
-    for event in existing_events {
-        display_event(event, &mut stdout)?;
-    }
+    let history: Vec<_> = jsonl::read(&mut stream)?;
+    let mut events = history;
 
     loop {
+        queue!(
+            stdout,
+            terminal::Clear(terminal::ClearType::All),
+            cursor::MoveTo(0, 0),
+        )?;
+
+        for event in &events {
+            display_event(event, &mut stdout)?;
+        }
+
         let event = jsonl::read(&mut stream)?;
-        display_event(event, &mut stdout)?;
+        events.push(event);
     }
 }
 
@@ -31,7 +39,7 @@ fn display_event(
         event,
         user,
         time_occurred,
-    }: Event,
+    }: &Event,
     stdout: &mut io::Stdout,
 ) -> anyhow::Result<()> {
     let user = format_user(user);
@@ -54,10 +62,10 @@ fn display_event(
     Ok(())
 }
 
-fn format_user(user: User) -> impl fmt::Display {
-    let base_styled_content = style(user.nickname).bold();
+fn format_user(user: &User) -> impl fmt::Display + '_ {
+    let base_styled_content = style(&user.nickname).bold();
 
-    if let Some(color) = user.color {
+    if let Some(ref color) = user.color {
         let color = match color {
             Color::Red => style::Color::Red,
             Color::Green => style::Color::Green,

@@ -31,9 +31,10 @@ fn handle_sender(
 ) -> anyhow::Result<()> {
     let mut connection = jsonl::Connection::new_from_tcp_stream(stream)?;
     let user = log_sender_in(&mut connection, &nickname_event_tx, &event_tx)?;
-    let time_occurred = Utc::now();
 
     loop {
+        let time_occurred = Utc::now();
+
         match connection.read() {
             Ok(sender_event) => {
                 let event = match sender_event {

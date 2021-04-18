@@ -45,7 +45,17 @@ fn main() -> anyhow::Result<()> {
             cursor::MoveTo(0, 0),
         )?;
 
-        for event in &events {
+        let (_, num_terminal_rows) = terminal::size()?;
+
+        let events_without_typing_events: Vec<_> = events
+            .iter()
+            .filter(|Event { event, .. }| !matches!(event, EventKind::Typing(_)))
+            .collect();
+
+        for event in &events_without_typing_events[events_without_typing_events
+            .len()
+            .saturating_sub(num_terminal_rows as usize)..]
+        {
             display_event(event, &mut stdout)?;
         }
 

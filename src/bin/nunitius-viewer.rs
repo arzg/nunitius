@@ -1,14 +1,17 @@
 use chrono::Local;
 use crossterm::style::{self, style, Styler};
-use crossterm::{cursor, queue, terminal};
+use crossterm::{cursor, event, queue, terminal};
+use flume::{Selector, Sender};
 use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
 use std::collections::HashSet;
-use std::fmt;
 use std::io::BufReader;
 use std::io::{self, Write};
 use std::net::TcpStream;
+use std::{fmt, thread};
 
 fn main() -> anyhow::Result<()> {
+    terminal::enable_raw_mode()?;
+
     let mut stdout = io::stdout();
     let mut stream = TcpStream::connect("127.0.0.1:9999")?;
 
@@ -19,6 +22,21 @@ fn main() -> anyhow::Result<()> {
     let history: Vec<_> = jsonl::read(&mut stream)?;
     let mut events = history;
     let mut currently_typing_users = HashSet::new();
+
+    let (input_tx, input_rx) = flume::unbounded();
+    let (event_tx, event_rx) = flume::unbounded();
+
+    thread::spawn(|| {
+        if let Err(e) = listen_for_input(input_tx) {
+            eprintln!("Error: {:#}", e);
+        }
+    });
+
+    thread::spawn(move || {
+        if let Err(e) = listen_for_events(&mut stream, event_tx) {
+            eprintln!("Error: {:#}", e);
+        }
+    });
 
     loop {
         queue!(
@@ -50,29 +68,53 @@ fn main() -> anyhow::Result<()> {
                 },
             )?;
         }
-
         stdout.flush()?;
 
-        let event = jsonl::read(&mut stream)?;
+        let control_flow = Selector::new()
+            .recv(&event_rx, |event| {
+                let event = event.unwrap();
 
-        if let Event {
-            event: EventKind::Typing(typing_event),
-            ref user,
-            ..
-        } = event
-        {
-            match typing_event {
-                TypingEvent::Start => {
-                    currently_typing_users.insert(user.clone());
+                if let Event {
+                    event: EventKind::Typing(typing_event),
+                    ref user,
+                    ..
+                } = event
+                {
+                    match typing_event {
+                        TypingEvent::Start => {
+                            currently_typing_users.insert(user.clone());
+                        }
+                        TypingEvent::Stop => {
+                            currently_typing_users.remove(user);
+                        }
+                    }
                 }
-                TypingEvent::Stop => {
-                    currently_typing_users.remove(user);
+
+                events.push(event);
+
+                ControlFlow::Continue
+            })
+            .recv(&input_rx, |input| {
+                let input = input.unwrap();
+
+                match input {
+                    Input::Up => {}
+                    Input::Down => {}
+                    Input::Quit => return ControlFlow::Break,
                 }
-            }
+
+                ControlFlow::Continue
+            })
+            .wait();
+
+        if let ControlFlow::Break = control_flow {
+            break;
         }
-
-        events.push(event);
     }
+
+    terminal::disable_raw_mode()?;
+
+    Ok(())
 }
 
 fn display_event(
@@ -90,12 +132,14 @@ fn display_event(
 
     match event {
         EventKind::Message(Message { body }) => {
-            writeln!(stdout, "[{}] {}: {}", local_time_occurred, user, body)?;
+            write!(stdout, "[{}] {}: {}", local_time_occurred, user, body)?;
         }
-        EventKind::Login => writeln!(stdout, "[{}] {} logged in!", local_time_occurred, user)?,
-        EventKind::Logout => writeln!(stdout, "[{}] {} logged out!", local_time_occurred, user)?,
-        EventKind::Typing(_) => {}
+        EventKind::Login => write!(stdout, "[{}] {} logged in!", local_time_occurred, user)?,
+        EventKind::Logout => write!(stdout, "[{}] {} logged out!", local_time_occurred, user)?,
+        EventKind::Typing(_) => return Ok(()),
     }
+
+    writeln!(stdout, "\r")?;
 
     Ok(())
 }
@@ -117,4 +161,46 @@ fn format_user(user: &User) -> impl fmt::Display + '_ {
     } else {
         base_styled_content
     }
+}
+
+enum ControlFlow {
+    Continue,
+    Break,
+}
+
+fn listen_for_events(
+    stream: &mut BufReader<TcpStream>,
+    event_tx: Sender<Event>,
+) -> anyhow::Result<()> {
+    loop {
+        let event = jsonl::read(&mut *stream)?;
+        event_tx.send(event).unwrap();
+    }
+}
+
+enum Input {
+    Up,
+    Down,
+    Quit,
+}
+
+fn listen_for_input(input_tx: Sender<Input>) -> anyhow::Result<()> {
+    loop {
+        if let event::Event::Key(event::KeyEvent {
+            code, modifiers, ..
+        }) = event::read()?
+        {
+            match (code, modifiers) {
+                (event::KeyCode::Char('c'), event::KeyModifiers::CONTROL) => {
+                    input_tx.send(Input::Quit).unwrap();
+                    break;
+                }
+                (event::KeyCode::Up, _) => input_tx.send(Input::Up).unwrap(),
+                (event::KeyCode::Down, _) => input_tx.send(Input::Down).unwrap(),
+                _ => {}
+            }
+        }
+    }
+
+    Ok(())
 }

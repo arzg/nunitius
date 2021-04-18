@@ -2,6 +2,7 @@ use chrono::Local;
 use crossterm::style::{self, style, Styler};
 use crossterm::{cursor, queue, terminal};
 use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
+use std::collections::HashSet;
 use std::fmt;
 use std::io::BufReader;
 use std::io::{self, Write};
@@ -17,6 +18,7 @@ fn main() -> anyhow::Result<()> {
 
     let history: Vec<_> = jsonl::read(&mut stream)?;
     let mut events = history;
+    let mut currently_typing_users = HashSet::new();
 
     loop {
         queue!(
@@ -29,7 +31,46 @@ fn main() -> anyhow::Result<()> {
             display_event(event, &mut stdout)?;
         }
 
+        if !currently_typing_users.is_empty() {
+            let (_, num_terminal_rows) = terminal::size()?;
+            queue!(stdout, cursor::MoveTo(0, num_terminal_rows - 1))?;
+
+            write!(
+                stdout,
+                "{} {} typing...",
+                currently_typing_users
+                    .iter()
+                    .map(|user| format_user(user).to_string())
+                    .collect::<Vec<_>>()
+                    .join(" and "),
+                if currently_typing_users.len() == 1 {
+                    "is"
+                } else {
+                    "are"
+                },
+            )?;
+        }
+
+        stdout.flush()?;
+
         let event = jsonl::read(&mut stream)?;
+
+        if let Event {
+            event: EventKind::Typing(typing_event),
+            ref user,
+            ..
+        } = event
+        {
+            match typing_event {
+                TypingEvent::Start => {
+                    currently_typing_users.insert(user.clone());
+                }
+                TypingEvent::Stop => {
+                    currently_typing_users.remove(user);
+                }
+            }
+        }
+
         events.push(event);
     }
 }
@@ -45,18 +86,15 @@ fn display_event(
     let user = format_user(user);
 
     let local_time_occurred = time_occurred.with_timezone(&Local);
-    write!(stdout, "[{}] ", local_time_occurred.format("%H:%M"))?;
+    let local_time_occurred = local_time_occurred.format("%H:%M");
 
     match event {
         EventKind::Message(Message { body }) => {
-            writeln!(stdout, "{}: {}", user, body)?;
+            writeln!(stdout, "[{}] {}: {}", local_time_occurred, user, body)?;
         }
-        EventKind::Login => writeln!(stdout, "{} logged in!", user)?,
-        EventKind::Logout => writeln!(stdout, "{} logged out!", user)?,
-        EventKind::Typing(event) => match event {
-            TypingEvent::Start => writeln!(stdout, "{} started typing...", user)?,
-            TypingEvent::Stop => writeln!(stdout, "{} stopped typing...", user)?,
-        },
+        EventKind::Login => writeln!(stdout, "[{}] {} logged in!", local_time_occurred, user)?,
+        EventKind::Logout => writeln!(stdout, "[{}] {} logged out!", local_time_occurred, user)?,
+        EventKind::Typing(_) => {}
     }
 
     Ok(())

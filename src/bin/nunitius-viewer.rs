@@ -3,7 +3,9 @@ use crossterm::style::{self, style, Styler};
 use crossterm::{cursor, event, queue, terminal};
 use flume::{Selector, Sender};
 use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
+use std::cell::Cell;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::io::BufReader;
 use std::io::{self, Write};
 use std::net::TcpStream;
@@ -22,6 +24,7 @@ fn main() -> anyhow::Result<()> {
     let history: Vec<_> = jsonl::read(&mut stream)?;
     let mut events = history;
     let mut currently_typing_users = HashSet::new();
+    let cursor_position = Cell::new(0);
 
     let (input_tx, input_rx) = flume::unbounded();
     let (event_tx, event_rx) = flume::unbounded();
@@ -52,9 +55,18 @@ fn main() -> anyhow::Result<()> {
             .filter(|Event { event, .. }| !matches!(event, EventKind::Typing(_)))
             .collect();
 
-        for event in &events_without_typing_events[events_without_typing_events
+        let start_idx = ((events_without_typing_events
             .len()
-            .saturating_sub(num_terminal_rows as usize)..]
+            .saturating_sub(num_terminal_rows as usize) as isize)
+            + cursor_position.get())
+        .max(0);
+
+        let end_idx = ((events_without_typing_events.len() as isize) + cursor_position.get())
+            .max(start_idx + num_terminal_rows as isize)
+            .min(events_without_typing_events.len() as isize);
+
+        for event in &events_without_typing_events
+            [start_idx.try_into().unwrap()..end_idx.try_into().unwrap()]
         {
             display_event(event, &mut stdout)?;
         }
@@ -98,6 +110,8 @@ fn main() -> anyhow::Result<()> {
                             currently_typing_users.remove(user);
                         }
                     }
+                } else {
+                    cursor_position.set(0);
                 }
 
                 events.push(event);
@@ -108,8 +122,12 @@ fn main() -> anyhow::Result<()> {
                 let input = input.unwrap();
 
                 match input {
-                    Input::Up => {}
-                    Input::Down => {}
+                    Input::Up => cursor_position.set(cursor_position.get() - 1),
+
+                    Input::Down => {
+                        cursor_position.set(cursor_position.get() + 1);
+                        cursor_position.set(cursor_position.get().min(0));
+                    }
                     Input::Quit => return ControlFlow::Break,
                 }
 

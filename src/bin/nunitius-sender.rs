@@ -43,15 +43,11 @@ fn main() -> anyhow::Result<()> {
     loop {
         let input = ui::read_input_evented("Type a message", &mut stdout, typing_event_tx.clone())?;
 
-        let input = if let Some(i) = input {
-            i
-        } else {
-            continue;
-        };
-
-        sender_event_tx
-            .send(SenderEvent::Message(Message { body: input }))
-            .unwrap();
+        if let Some(input) = input {
+            sender_event_tx
+                .send(SenderEvent::Message(Message { body: input }))
+                .unwrap();
+        }
 
         execute!(
             stdout,

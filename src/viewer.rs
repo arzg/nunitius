@@ -1,3 +1,6 @@
+mod protocol;
+pub use protocol::Protocol;
+
 use crate::{Color, Event as ServerEvent, EventKind as ServerEventKind, Message, User};
 use chrono::{DateTime, Local, Utc};
 use crossterm::style::{self, style, Styler};

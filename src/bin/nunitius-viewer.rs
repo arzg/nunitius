@@ -1,31 +1,30 @@
 use crossterm::{cursor, event, queue, terminal};
 use flume::{Selector, Sender};
-use nunitius::{ConnectionKind, Event as ServerEvent, EventKind as ServerEventKind, TypingEvent};
+use nunitius::viewer::Protocol;
+use nunitius::{Event as ServerEvent, EventKind as ServerEventKind, TypingEvent};
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::convert::TryInto;
-use std::io::BufReader;
 use std::io::{self, Write};
-use std::net::TcpStream;
 use std::thread;
 
 fn main() -> anyhow::Result<()> {
     terminal::enable_raw_mode()?;
 
     let mut stdout = io::stdout();
-    let mut stream = TcpStream::connect("127.0.0.1:9999")?;
+    let protocol = Protocol::connect("127.0.0.1:9999")?;
 
-    jsonl::write(&mut stream, &ConnectionKind::Viewer)?;
+    let (server_event_tx, server_event_rx) = flume::bounded(100);
+    let (event_tx, event_rx) = flume::bounded(100);
 
-    let mut stream = BufReader::new(stream);
+    let protocol = protocol.send_connection_kind(server_event_tx, event_tx)?;
+    let mut protocol = protocol.read_history()?;
 
-    let history: Vec<_> = jsonl::read(&mut stream)?;
-    let mut server_events = history;
+    let mut events = Vec::new();
     let mut currently_typing_users = HashSet::new();
     let cursor_position = Cell::new(0);
 
     let (input_tx, input_rx) = flume::unbounded();
-    let (event_tx, event_rx) = flume::unbounded();
 
     thread::spawn(|| {
         if let Err(e) = listen_for_input(input_tx) {
@@ -34,7 +33,7 @@ fn main() -> anyhow::Result<()> {
     });
 
     thread::spawn(move || {
-        if let Err(e) = listen_for_events(&mut stream, event_tx) {
+        if let Err(e) = protocol.read_events() {
             eprintln!("Error: {:#}", e);
         }
     });
@@ -47,12 +46,6 @@ fn main() -> anyhow::Result<()> {
         )?;
 
         let (_, num_terminal_rows) = terminal::size()?;
-
-        let events: Vec<_> = server_events
-            .iter()
-            .cloned()
-            .filter_map(nunitius::viewer::Event::from_server_event)
-            .collect();
 
         let start_idx = ((events.len().saturating_sub(num_terminal_rows as usize) as isize)
             + cursor_position.get())
@@ -79,8 +72,8 @@ fn main() -> anyhow::Result<()> {
         stdout.flush()?;
 
         let control_flow = Selector::new()
-            .recv(&event_rx, |event| {
-                let server_event = event.unwrap();
+            .recv(&server_event_rx, |server_event| {
+                let server_event = server_event.unwrap();
 
                 if let ServerEvent {
                     event: ServerEventKind::Typing(typing_event),
@@ -96,11 +89,15 @@ fn main() -> anyhow::Result<()> {
                             currently_typing_users.remove(user);
                         }
                     }
-                } else {
-                    cursor_position.set(0);
                 }
 
-                server_events.push(server_event);
+                ControlFlow::Continue
+            })
+            .recv(&event_rx, |event| {
+                let event = event.unwrap();
+
+                cursor_position.set(0);
+                events.push(event);
 
                 ControlFlow::Continue
             })
@@ -134,16 +131,6 @@ fn main() -> anyhow::Result<()> {
 enum ControlFlow {
     Continue,
     Break,
-}
-
-fn listen_for_events(
-    stream: &mut BufReader<TcpStream>,
-    event_tx: Sender<ServerEvent>,
-) -> anyhow::Result<()> {
-    loop {
-        let event = jsonl::read(&mut *stream)?;
-        event_tx.send(event).unwrap();
-    }
 }
 
 enum Input {

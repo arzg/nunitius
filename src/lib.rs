@@ -1,5 +1,6 @@
 pub mod sender;
 pub mod server;
+pub mod viewer;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

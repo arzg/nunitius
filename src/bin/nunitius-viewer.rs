@@ -1,15 +1,13 @@
-use chrono::Local;
-use crossterm::style::{self, style, Styler};
 use crossterm::{cursor, event, queue, terminal};
 use flume::{Selector, Sender};
-use nunitius::{Color, ConnectionKind, Event, EventKind, Message, TypingEvent, User};
+use nunitius::{ConnectionKind, Event, EventKind, TypingEvent};
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::io::BufReader;
 use std::io::{self, Write};
 use std::net::TcpStream;
-use std::{fmt, thread};
+use std::thread;
 
 fn main() -> anyhow::Result<()> {
     terminal::enable_raw_mode()?;
@@ -68,7 +66,9 @@ fn main() -> anyhow::Result<()> {
         for event in &events_without_typing_events
             [start_idx.try_into().unwrap()..end_idx.try_into().unwrap()]
         {
-            display_event(event, &mut stdout)?;
+            if let Some(formatted) = nunitius::viewer::render_event(event) {
+                writeln!(stdout, "{}\r", formatted)?;
+            }
         }
 
         if !currently_typing_users.is_empty() {
@@ -77,17 +77,8 @@ fn main() -> anyhow::Result<()> {
 
             write!(
                 stdout,
-                "{} {} typing...",
-                currently_typing_users
-                    .iter()
-                    .map(|user| format_user(user).to_string())
-                    .collect::<Vec<_>>()
-                    .join(" and "),
-                if currently_typing_users.len() == 1 {
-                    "is"
-                } else {
-                    "are"
-                },
+                "{}",
+                nunitius::viewer::render_currently_typing_users(currently_typing_users.iter()),
             )?;
         }
         stdout.flush()?;
@@ -143,52 +134,6 @@ fn main() -> anyhow::Result<()> {
     terminal::disable_raw_mode()?;
 
     Ok(())
-}
-
-fn display_event(
-    Event {
-        event,
-        user,
-        time_occurred,
-    }: &Event,
-    stdout: &mut io::Stdout,
-) -> anyhow::Result<()> {
-    let user = format_user(user);
-
-    let local_time_occurred = time_occurred.with_timezone(&Local);
-    let local_time_occurred = local_time_occurred.format("%H:%M");
-
-    match event {
-        EventKind::Message(Message { body }) => {
-            write!(stdout, "[{}] {}: {}", local_time_occurred, user, body)?;
-        }
-        EventKind::Login => write!(stdout, "[{}] {} logged in!", local_time_occurred, user)?,
-        EventKind::Logout => write!(stdout, "[{}] {} logged out!", local_time_occurred, user)?,
-        EventKind::Typing(_) => return Ok(()),
-    }
-
-    writeln!(stdout, "\r")?;
-
-    Ok(())
-}
-
-fn format_user(user: &User) -> impl fmt::Display + '_ {
-    let base_styled_content = style(&user.nickname).bold();
-
-    if let Some(ref color) = user.color {
-        let color = match color {
-            Color::Red => style::Color::Red,
-            Color::Green => style::Color::Green,
-            Color::Yellow => style::Color::Yellow,
-            Color::Blue => style::Color::Blue,
-            Color::Magenta => style::Color::Magenta,
-            Color::Cyan => style::Color::Cyan,
-        };
-
-        base_styled_content.with(color)
-    } else {
-        base_styled_content
-    }
 }
 
 enum ControlFlow {

@@ -1,6 +1,6 @@
 use crossterm::{cursor, event, queue, terminal};
 use flume::{Selector, Sender};
-use nunitius::{ConnectionKind, Event, EventKind, TypingEvent};
+use nunitius::{ConnectionKind, Event as ServerEvent, EventKind as ServerEventKind, TypingEvent};
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
     let mut stream = BufReader::new(stream);
 
     let history: Vec<_> = jsonl::read(&mut stream)?;
-    let mut events = history;
+    let mut server_events = history;
     let mut currently_typing_users = HashSet::new();
     let cursor_position = Cell::new(0);
 
@@ -48,27 +48,22 @@ fn main() -> anyhow::Result<()> {
 
         let (_, num_terminal_rows) = terminal::size()?;
 
-        let events_without_typing_events: Vec<_> = events
+        let events: Vec<_> = server_events
             .iter()
-            .filter(|Event { event, .. }| !matches!(event, EventKind::Typing(_)))
+            .cloned()
+            .filter_map(nunitius::viewer::Event::from_server_event)
             .collect();
 
-        let start_idx = ((events_without_typing_events
-            .len()
-            .saturating_sub(num_terminal_rows as usize) as isize)
+        let start_idx = ((events.len().saturating_sub(num_terminal_rows as usize) as isize)
             + cursor_position.get())
         .max(0);
 
-        let end_idx = ((events_without_typing_events.len() as isize) + cursor_position.get())
+        let end_idx = ((events.len() as isize) + cursor_position.get())
             .max(start_idx + num_terminal_rows as isize)
-            .min(events_without_typing_events.len() as isize);
+            .min(events.len() as isize);
 
-        for event in &events_without_typing_events
-            [start_idx.try_into().unwrap()..end_idx.try_into().unwrap()]
-        {
-            if let Some(formatted) = nunitius::viewer::render_event(event) {
-                writeln!(stdout, "{}\r", formatted)?;
-            }
+        for event in &events[start_idx.try_into().unwrap()..end_idx.try_into().unwrap()] {
+            writeln!(stdout, "{}\r", nunitius::viewer::render_event(event))?;
         }
 
         if !currently_typing_users.is_empty() {
@@ -85,13 +80,13 @@ fn main() -> anyhow::Result<()> {
 
         let control_flow = Selector::new()
             .recv(&event_rx, |event| {
-                let event = event.unwrap();
+                let server_event = event.unwrap();
 
-                if let Event {
-                    event: EventKind::Typing(typing_event),
+                if let ServerEvent {
+                    event: ServerEventKind::Typing(typing_event),
                     ref user,
                     ..
-                } = event
+                } = server_event
                 {
                     match typing_event {
                         TypingEvent::Start => {
@@ -105,7 +100,7 @@ fn main() -> anyhow::Result<()> {
                     cursor_position.set(0);
                 }
 
-                events.push(event);
+                server_events.push(server_event);
 
                 ControlFlow::Continue
             })
@@ -143,7 +138,7 @@ enum ControlFlow {
 
 fn listen_for_events(
     stream: &mut BufReader<TcpStream>,
-    event_tx: Sender<Event>,
+    event_tx: Sender<ServerEvent>,
 ) -> anyhow::Result<()> {
     loop {
         let event = jsonl::read(&mut *stream)?;

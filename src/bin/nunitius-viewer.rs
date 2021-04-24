@@ -95,8 +95,8 @@ fn main() -> anyhow::Result<()> {
                 let mut timeline = timeline.borrow_mut();
 
                 match ui_event.unwrap() {
-                    UiEvent::Up => timeline.move_up(),
-                    UiEvent::Down => timeline.move_down(),
+                    UiEvent::Up => timeline.scroll_up(),
+                    UiEvent::Down => timeline.scroll_down(),
 
                     // we leave one line free for currently typing users
                     UiEvent::Resize { height } => timeline.resize(height - 1),

@@ -17,7 +17,7 @@ impl Timeline {
 
     pub fn add_event(&mut self, event: Event) {
         self.events.push(event);
-        self.move_to_bottom();
+        self.scroll_to_bottom();
     }
 
     pub fn visible_events(&self) -> &[Event] {
@@ -37,23 +37,23 @@ impl Timeline {
         self.height = new_height;
 
         if self.past_bottom() {
-            self.move_to_bottom();
+            self.scroll_to_bottom();
         }
     }
 
-    pub fn move_up(&mut self) {
+    pub fn scroll_up(&mut self) {
         if !self.at_top() {
             self.top_event_idx -= 1;
         }
     }
 
-    pub fn move_down(&mut self) {
+    pub fn scroll_down(&mut self) {
         if !self.at_bottom() {
             self.top_event_idx += 1;
         }
     }
 
-    fn move_to_bottom(&mut self) {
+    fn scroll_to_bottom(&mut self) {
         self.top_event_idx = if self.can_all_events_fit_on_screen() {
             0
         } else {
@@ -146,14 +146,14 @@ mod tests {
     }
 
     #[test]
-    fn moving_up_reveals_old_events() {
+    fn scrolling_up_reveals_old_events() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());
         timeline.add_event(EVENT_2.clone());
         timeline.add_event(EVENT_3.clone());
 
-        timeline.move_up();
+        timeline.scroll_up();
 
         assert_eq!(
             timeline.visible_events(),
@@ -162,15 +162,15 @@ mod tests {
     }
 
     #[test]
-    fn moving_up_past_top_does_nothing() {
+    fn scrolling_up_past_top_does_nothing() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());
         timeline.add_event(EVENT_2.clone());
         timeline.add_event(EVENT_3.clone());
 
-        timeline.move_up();
-        timeline.move_up();
+        timeline.scroll_up();
+        timeline.scroll_up();
 
         assert_eq!(
             timeline.visible_events(),
@@ -179,20 +179,20 @@ mod tests {
     }
 
     #[test]
-    fn moving_down_reveals_newer_events() {
+    fn scrolling_down_reveals_newer_events() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());
         timeline.add_event(EVENT_2.clone());
         timeline.add_event(EVENT_3.clone());
 
-        timeline.move_up();
+        timeline.scroll_up();
         assert_eq!(
             timeline.visible_events(),
             [EVENT_1.clone(), EVENT_2.clone()]
         );
 
-        timeline.move_down();
+        timeline.scroll_down();
         assert_eq!(
             timeline.visible_events(),
             [EVENT_2.clone(), EVENT_3.clone()]
@@ -200,14 +200,14 @@ mod tests {
     }
 
     #[test]
-    fn moving_down_past_bottom_does_nothing() {
+    fn scrolling_down_past_bottom_does_nothing() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());
         timeline.add_event(EVENT_2.clone());
         timeline.add_event(EVENT_3.clone());
 
-        timeline.move_down();
+        timeline.scroll_down();
         assert_eq!(
             timeline.visible_events(),
             [EVENT_2.clone(), EVENT_3.clone()]
@@ -215,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn goes_to_the_bottom_after_adding_an_event() {
+    fn scrolls_to_the_bottom_after_adding_an_event() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());
@@ -226,7 +226,7 @@ mod tests {
             [EVENT_2.clone(), EVENT_3.clone()]
         );
 
-        timeline.move_up();
+        timeline.scroll_up();
         assert_eq!(
             timeline.visible_events(),
             [EVENT_1.clone(), EVENT_2.clone()]
@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn resizing_smaller_does_not_move() {
+    fn resizing_smaller_does_not_scroll() {
         let mut timeline = Timeline::new(3);
 
         timeline.add_event(EVENT_1.clone());
@@ -261,14 +261,14 @@ mod tests {
     }
 
     #[test]
-    fn resizing_larger_does_not_move_if_unneeded() {
+    fn resizing_larger_does_not_scroll_if_unneeded() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());
         timeline.add_event(EVENT_2.clone());
         timeline.add_event(EVENT_3.clone());
 
-        timeline.move_up();
+        timeline.scroll_up();
         assert_eq!(
             timeline.visible_events(),
             [EVENT_1.clone(), EVENT_2.clone()]
@@ -282,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn resizing_larger_moves_up_if_needed() {
+    fn resizing_larger_scrolls_up_if_needed() {
         let mut timeline = Timeline::new(2);
 
         timeline.add_event(EVENT_1.clone());

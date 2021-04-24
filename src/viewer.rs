@@ -16,7 +16,7 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn from_server_event(server_event: ServerEvent) -> Option<Self> {
+    fn from_server_event(server_event: ServerEvent) -> Option<Self> {
         Some(Self {
             event: match server_event.event {
                 ServerEventKind::Message(msg) => EventKind::Message(msg),
@@ -71,7 +71,7 @@ pub fn render_currently_typing_users<'a>(
     }
 }
 
-pub fn render_user(user: &User) -> String {
+fn render_user(user: &User) -> String {
     let base_styled_content = style(&user.nickname).bold();
 
     if let Some(ref color) = user.color {

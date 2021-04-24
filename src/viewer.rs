@@ -2,6 +2,9 @@ mod protocol;
 mod timeline;
 mod ui;
 
+#[cfg(test)]
+mod dummy_events;
+
 pub use protocol::Protocol;
 pub use timeline::Timeline;
 pub use ui::{render_currently_typing_users, render_event};

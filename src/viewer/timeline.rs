@@ -88,29 +88,8 @@ impl Timeline {
 
 #[cfg(test)]
 mod tests {
+    use super::super::dummy_events::*;
     use super::*;
-    use crate::viewer::EventKind;
-    use crate::User;
-    use chrono::Utc;
-    use once_cell::sync::Lazy;
-
-    macro_rules! define_test_event {
-        ($name:ident) => {
-            static $name: Lazy<Event> = Lazy::new(|| Event {
-                event: EventKind::Login,
-                user: User {
-                    nickname: stringify!($name).to_string(),
-                    color: None,
-                },
-                time_occurred: Utc::now(),
-            });
-        };
-    }
-
-    define_test_event!(EVENT_1);
-    define_test_event!(EVENT_2);
-    define_test_event!(EVENT_3);
-    define_test_event!(EVENT_4);
 
     #[test]
     fn empty_has_no_visible_events() {

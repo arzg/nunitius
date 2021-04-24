@@ -1,11 +1,14 @@
 mod protocol;
+mod timeline;
+
 pub use protocol::Protocol;
+pub use timeline::Timeline;
 
 use crate::{Color, Event as ServerEvent, EventKind as ServerEventKind, Message, User};
 use chrono::{DateTime, Local, Utc};
 use crossterm::style::{self, style, Styler};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Event {
     pub event: EventKind,
     pub user: User,
@@ -27,7 +30,7 @@ impl Event {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EventKind {
     Message(Message),
     Login,

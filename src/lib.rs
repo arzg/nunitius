@@ -32,7 +32,7 @@ pub enum TypingEvent {
     Stop,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub body: String,
 }

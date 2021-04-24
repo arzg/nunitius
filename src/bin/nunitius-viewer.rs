@@ -1,10 +1,9 @@
 use crossterm::{cursor, event, queue, terminal};
 use flume::{Selector, Sender};
-use nunitius::viewer::Protocol;
+use nunitius::viewer::{Protocol, Timeline};
 use nunitius::{Event as ServerEvent, EventKind as ServerEventKind, TypingEvent};
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::collections::HashSet;
-use std::convert::TryInto;
 use std::io::{self, Write};
 use std::thread;
 
@@ -20,9 +19,14 @@ fn main() -> anyhow::Result<()> {
     let protocol = protocol.send_connection_kind(server_event_tx, event_tx)?;
     let mut protocol = protocol.read_history()?;
 
-    let mut events = Vec::new();
+    let timeline = {
+        let (_, num_terminal_rows) = terminal::size()?;
+
+        // we leave one line free for currently typing users
+        RefCell::new(Timeline::new(usize::from(num_terminal_rows) - 1))
+    };
+
     let mut currently_typing_users = HashSet::new();
-    let cursor_position = Cell::new(0);
 
     let (input_tx, input_rx) = flume::unbounded();
 
@@ -45,17 +49,7 @@ fn main() -> anyhow::Result<()> {
             cursor::MoveTo(0, 0),
         )?;
 
-        let (_, num_terminal_rows) = terminal::size()?;
-
-        let start_idx = ((events.len().saturating_sub(num_terminal_rows as usize) as isize)
-            + cursor_position.get())
-        .max(0);
-
-        let end_idx = ((events.len() as isize) + cursor_position.get())
-            .max(start_idx + num_terminal_rows as isize)
-            .min(events.len() as isize);
-
-        for event in &events[start_idx.try_into().unwrap()..end_idx.try_into().unwrap()] {
+        for event in timeline.borrow().visible_events() {
             writeln!(stdout, "{}\r", nunitius::viewer::render_event(event))?;
         }
 
@@ -94,23 +88,13 @@ fn main() -> anyhow::Result<()> {
                 ControlFlow::Continue
             })
             .recv(&event_rx, |event| {
-                let event = event.unwrap();
-
-                cursor_position.set(0);
-                events.push(event);
-
+                timeline.borrow_mut().add_event(event.unwrap());
                 ControlFlow::Continue
             })
             .recv(&input_rx, |input| {
-                let input = input.unwrap();
-
-                match input {
-                    Input::Up => cursor_position.set(cursor_position.get() - 1),
-
-                    Input::Down => {
-                        cursor_position.set(cursor_position.get() + 1);
-                        cursor_position.set(cursor_position.get().min(0));
-                    }
+                match input.unwrap() {
+                    Input::Up => timeline.borrow_mut().move_up(),
+                    Input::Down => timeline.borrow_mut().move_down(),
                     Input::Quit => return ControlFlow::Break,
                 }
 

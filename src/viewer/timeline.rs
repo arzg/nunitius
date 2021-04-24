@@ -22,7 +22,13 @@ impl Timeline {
 
     pub fn visible_events(&self) -> &[Event] {
         let visible_events = &self.events[self.top_event_idx..self.bottom_event_idx()];
-        assert!(visible_events.len() <= self.height);
+
+        let expected_num_events = if self.can_all_events_fit_on_screen() {
+            self.events.len()
+        } else {
+            self.height
+        };
+        assert_eq!(visible_events.len(), expected_num_events);
 
         visible_events
     }

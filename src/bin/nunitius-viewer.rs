@@ -28,10 +28,10 @@ fn main() -> anyhow::Result<()> {
 
     let mut currently_typing_users = HashSet::new();
 
-    let (input_tx, input_rx) = flume::unbounded();
+    let (ui_event_tx, ui_event_rx) = flume::unbounded();
 
     thread::spawn(|| {
-        if let Err(e) = listen_for_input(input_tx) {
+        if let Err(e) = listen_for_ui_events(ui_event_tx) {
             eprintln!("Error: {:#}", e);
         }
     });
@@ -91,11 +91,17 @@ fn main() -> anyhow::Result<()> {
                 timeline.borrow_mut().add_event(event.unwrap());
                 ControlFlow::Continue
             })
-            .recv(&input_rx, |input| {
-                match input.unwrap() {
-                    Input::Up => timeline.borrow_mut().move_up(),
-                    Input::Down => timeline.borrow_mut().move_down(),
-                    Input::Quit => return ControlFlow::Break,
+            .recv(&ui_event_rx, |ui_event| {
+                let mut timeline = timeline.borrow_mut();
+
+                match ui_event.unwrap() {
+                    UiEvent::Up => timeline.move_up(),
+                    UiEvent::Down => timeline.move_down(),
+
+                    // we leave one line free for currently typing users
+                    UiEvent::Resize { height } => timeline.resize(height - 1),
+
+                    UiEvent::Quit => return ControlFlow::Break,
                 }
 
                 ControlFlow::Continue
@@ -117,27 +123,34 @@ enum ControlFlow {
     Break,
 }
 
-enum Input {
+enum UiEvent {
     Up,
     Down,
+    Resize { height: usize },
     Quit,
 }
 
-fn listen_for_input(input_tx: Sender<Input>) -> anyhow::Result<()> {
+fn listen_for_ui_events(ui_event_tx: Sender<UiEvent>) -> anyhow::Result<()> {
     loop {
-        if let event::Event::Key(event::KeyEvent {
-            code, modifiers, ..
-        }) = event::read()?
-        {
-            match (code, modifiers) {
+        match event::read()? {
+            event::Event::Key(event::KeyEvent {
+                code, modifiers, ..
+            }) => match (code, modifiers) {
                 (event::KeyCode::Char('c'), event::KeyModifiers::CONTROL) => {
-                    input_tx.send(Input::Quit).unwrap();
+                    ui_event_tx.send(UiEvent::Quit).unwrap();
                     break;
                 }
-                (event::KeyCode::Up, _) => input_tx.send(Input::Up).unwrap(),
-                (event::KeyCode::Down, _) => input_tx.send(Input::Down).unwrap(),
+                (event::KeyCode::Up, _) => ui_event_tx.send(UiEvent::Up).unwrap(),
+                (event::KeyCode::Down, _) => ui_event_tx.send(UiEvent::Down).unwrap(),
                 _ => {}
+            },
+
+            event::Event::Resize(_, height) => {
+                let height = usize::from(height);
+                ui_event_tx.send(UiEvent::Resize { height }).unwrap();
             }
+
+            _ => {}
         }
     }
 

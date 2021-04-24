@@ -33,9 +33,11 @@ impl Timeline {
         visible_events
     }
 
-    fn move_to_bottom(&mut self) {
-        while !self.at_bottom() {
-            self.move_down();
+    pub fn resize(&mut self, new_height: usize) {
+        self.height = new_height;
+
+        if self.past_bottom() {
+            self.move_to_bottom();
         }
     }
 
@@ -49,6 +51,18 @@ impl Timeline {
         if !self.at_bottom() {
             self.top_event_idx += 1;
         }
+    }
+
+    fn move_to_bottom(&mut self) {
+        self.top_event_idx = if self.can_all_events_fit_on_screen() {
+            0
+        } else {
+            self.events.len() - self.height
+        };
+    }
+
+    fn past_bottom(&self) -> bool {
+        self.top_event_idx + self.height > self.events.len()
     }
 
     fn at_top(&self) -> bool {
@@ -222,6 +236,67 @@ mod tests {
         assert_eq!(
             timeline.visible_events(),
             [EVENT_3.clone(), EVENT_4.clone()]
+        );
+    }
+
+    #[test]
+    fn resizing_smaller_does_not_move() {
+        let mut timeline = Timeline::new(3);
+
+        timeline.add_event(EVENT_1.clone());
+        timeline.add_event(EVENT_2.clone());
+        timeline.add_event(EVENT_3.clone());
+        timeline.add_event(EVENT_4.clone());
+
+        assert_eq!(
+            timeline.visible_events(),
+            [EVENT_2.clone(), EVENT_3.clone(), EVENT_4.clone()]
+        );
+
+        timeline.resize(2);
+        assert_eq!(
+            timeline.visible_events(),
+            [EVENT_2.clone(), EVENT_3.clone()]
+        );
+    }
+
+    #[test]
+    fn resizing_larger_does_not_move_if_unneeded() {
+        let mut timeline = Timeline::new(2);
+
+        timeline.add_event(EVENT_1.clone());
+        timeline.add_event(EVENT_2.clone());
+        timeline.add_event(EVENT_3.clone());
+
+        timeline.move_up();
+        assert_eq!(
+            timeline.visible_events(),
+            [EVENT_1.clone(), EVENT_2.clone()]
+        );
+
+        timeline.resize(3);
+        assert_eq!(
+            timeline.visible_events(),
+            [EVENT_1.clone(), EVENT_2.clone(), EVENT_3.clone()]
+        );
+    }
+
+    #[test]
+    fn resizing_larger_moves_up_if_needed() {
+        let mut timeline = Timeline::new(2);
+
+        timeline.add_event(EVENT_1.clone());
+        timeline.add_event(EVENT_2.clone());
+        timeline.add_event(EVENT_3.clone());
+        assert_eq!(
+            timeline.visible_events(),
+            [EVENT_2.clone(), EVENT_3.clone()]
+        );
+
+        timeline.resize(3);
+        assert_eq!(
+            timeline.visible_events(),
+            [EVENT_1.clone(), EVENT_2.clone(), EVENT_3.clone()]
         );
     }
 }

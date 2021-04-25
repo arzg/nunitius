@@ -1,9 +1,9 @@
 use crossterm::{cursor, event, queue, terminal};
 use flume::{Selector, Sender};
-use nunitius::viewer::{Protocol, Timeline};
+use itertools::Itertools;
+use nunitius::viewer::{App, Protocol, RenderedUi};
 use nunitius::{Event as ServerEvent, EventKind as ServerEventKind, TypingEvent};
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::io::{self, Write};
 use std::thread;
 
@@ -19,14 +19,10 @@ fn main() -> anyhow::Result<()> {
     let protocol = protocol.send_connection_kind(server_event_tx, event_tx)?;
     let mut protocol = protocol.read_history()?;
 
-    let timeline = {
+    let app = {
         let (_, num_terminal_rows) = terminal::size()?;
-
-        // we leave one line free for currently typing users
-        RefCell::new(Timeline::new(usize::from(num_terminal_rows) - 1))
+        RefCell::new(App::new(num_terminal_rows.into()))
     };
-
-    let mut currently_typing_users = HashSet::new();
 
     let (ui_event_tx, ui_event_rx) = flume::unbounded();
 
@@ -48,21 +44,7 @@ fn main() -> anyhow::Result<()> {
             terminal::Clear(terminal::ClearType::All),
             cursor::MoveTo(0, 0),
         )?;
-
-        for event in timeline.borrow().visible_events() {
-            writeln!(stdout, "{}\r", nunitius::viewer::render_event(event))?;
-        }
-
-        if !currently_typing_users.is_empty() {
-            let (_, num_terminal_rows) = terminal::size()?;
-            queue!(stdout, cursor::MoveTo(0, num_terminal_rows - 1))?;
-
-            write!(
-                stdout,
-                "{}",
-                nunitius::viewer::render_currently_typing_users(currently_typing_users.iter()),
-            )?;
-        }
+        print_rendered_ui(app.borrow().render(), &mut stdout)?;
         stdout.flush()?;
 
         let control_flow = Selector::new()
@@ -71,36 +53,30 @@ fn main() -> anyhow::Result<()> {
 
                 if let ServerEvent {
                     event: ServerEventKind::Typing(typing_event),
-                    ref user,
+                    user,
                     ..
                 } = server_event
                 {
+                    let mut app = app.borrow_mut();
                     match typing_event {
-                        TypingEvent::Start => {
-                            currently_typing_users.insert(user.clone());
-                        }
-                        TypingEvent::Stop => {
-                            currently_typing_users.remove(user);
-                        }
+                        TypingEvent::Start => app.start_typing(user),
+                        TypingEvent::Stop => app.stop_typing(&user),
                     }
                 }
 
                 ControlFlow::Continue
             })
             .recv(&event_rx, |event| {
-                timeline.borrow_mut().add_event(event.unwrap());
+                app.borrow_mut().handle_event(event.unwrap());
                 ControlFlow::Continue
             })
             .recv(&ui_event_rx, |ui_event| {
-                let mut timeline = timeline.borrow_mut();
+                let mut app = app.borrow_mut();
 
                 match ui_event.unwrap() {
-                    UiEvent::Up => timeline.scroll_up(),
-                    UiEvent::Down => timeline.scroll_down(),
-
-                    // we leave one line free for currently typing users
-                    UiEvent::Resize { height } => timeline.resize(height - 1),
-
+                    UiEvent::Up => app.scroll_up(),
+                    UiEvent::Down => app.scroll_down(),
+                    UiEvent::Resize { height } => app.resize(height),
                     UiEvent::Quit => return ControlFlow::Break,
                 }
 
@@ -152,6 +128,14 @@ fn listen_for_ui_events(ui_event_tx: Sender<UiEvent>) -> anyhow::Result<()> {
 
             _ => {}
         }
+    }
+
+    Ok(())
+}
+
+fn print_rendered_ui(rendered: RenderedUi, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+    for line in Itertools::intersperse(rendered.lines(), "\r\n") {
+        write!(stdout, "{}", line)?;
     }
 
     Ok(())

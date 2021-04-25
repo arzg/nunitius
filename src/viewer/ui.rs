@@ -3,7 +3,7 @@ use crate::{Color, Message, User};
 use chrono::Local;
 use crossterm::style::{self, style, Styler};
 
-pub fn render_event(
+pub(super) fn render_event(
     Event {
         event,
         user,
@@ -24,16 +24,16 @@ pub fn render_event(
     }
 }
 
-pub fn render_currently_typing_users<'a>(
+pub(super) fn render_currently_typing_users<'a>(
     mut users: impl Iterator<Item = &'a User> + ExactSizeIterator,
 ) -> String {
-    let num_users = users.len();
-
-    if num_users == 1 {
-        format!("{} is typing...", render_user(users.next().unwrap()))
-    } else {
-        let users = users.map(render_user).collect::<Vec<_>>().join(" and ");
-        format!("{} are typing...", users)
+    match users.len() {
+        0 => String::new(),
+        1 => format!("{} is typing...", render_user(users.next().unwrap())),
+        _ => {
+            let users = users.map(render_user).collect::<Vec<_>>().join(" and ");
+            format!("{} are typing...", users)
+        }
     }
 }
 

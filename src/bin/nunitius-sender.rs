@@ -1,10 +1,13 @@
-use crossterm::{cursor, execute, terminal};
+use crossterm::{cursor, event, execute, terminal};
+use flume::Sender;
 use jsonl::Connection;
 use nunitius::sender::ui;
-use nunitius::{Color, ConnectionKind, Login, LoginResponse, Message, SenderEvent, User};
+use nunitius::{
+    Color, ConnectionKind, Login, LoginResponse, Message, SenderEvent, TypingEvent, User,
+};
 use std::io::{self, Write};
 use std::net::TcpStream;
-use std::thread;
+use std::{fs, thread};
 
 type TcpConnection = Connection<io::BufReader<TcpStream>, TcpStream>;
 
@@ -41,20 +44,60 @@ fn main() -> anyhow::Result<()> {
     });
 
     loop {
-        let input = ui::read_input_evented("Type a message", &mut stdout, typing_event_tx.clone())?;
+        let input = read_and_clear_evented(
+            "Type a message",
+            &mut io::stdout(),
+            typing_event_tx.clone(),
+            |code, modifiers| {
+                if let (event::KeyCode::Char('u'), event::KeyModifiers::CONTROL) = (code, modifiers)
+                {
+                    handle_file_upload(&mut stdout, &sender_event_tx)?;
+                }
+
+                Ok(())
+            },
+        )?;
 
         if let Some(input) = input {
             sender_event_tx
-                .send(SenderEvent::Message(Message { body: input }))
+                .send(SenderEvent::Message(Message::Text { body: input }))
                 .unwrap();
         }
-
-        execute!(
-            stdout,
-            cursor::MoveUp(1),
-            terminal::Clear(terminal::ClearType::CurrentLine),
-        )?;
     }
+}
+
+fn handle_file_upload(
+    stdout: &mut io::Stdout,
+    sender_event_tx: &flume::Sender<SenderEvent>,
+) -> Result<(), anyhow::Error> {
+    loop {
+        let path = read_and_clear("Choose a file to upload", stdout)?;
+
+        let path = if let Some(path) = path {
+            path
+        } else {
+            continue;
+        };
+
+        let file_contents = fs::read(path)?;
+
+        sender_event_tx
+            .send(SenderEvent::Message(Message::File {
+                contents: file_contents,
+            }))
+            .unwrap();
+
+        break;
+    }
+
+    execute!(
+        stdout,
+        cursor::MoveUp(1),
+        terminal::Clear(terminal::ClearType::CurrentLine),
+    )?;
+    // write!(stdout, "\r")?;
+
+    Ok(())
 }
 
 fn login(
@@ -63,7 +106,7 @@ fn login(
     stderr: &mut io::Stderr,
 ) -> anyhow::Result<()> {
     loop {
-        let nickname = ui::read_input("Choose a nickname", stdout)?;
+        let nickname = read_and_clear("Choose a nickname", stdout)?;
 
         let nickname = if let Some(n) = nickname {
             n
@@ -90,7 +133,7 @@ fn login(
 
 fn read_color(stdout: &mut io::Stdout, stderr: &mut io::Stderr) -> anyhow::Result<Option<Color>> {
     loop {
-        let color = if let Some(s) = ui::read_input("Choose a color", stdout)? {
+        let color = if let Some(s) = read_and_clear("Choose a color", stdout)? {
             s
         } else {
             return Ok(None);
@@ -111,4 +154,34 @@ fn read_color(stdout: &mut io::Stdout, stderr: &mut io::Stderr) -> anyhow::Resul
 
         return Ok(Some(color));
     }
+}
+
+fn read_and_clear(prompt: &str, stdout: &mut io::Stdout) -> anyhow::Result<Option<String>> {
+    let output = ui::read_input(prompt, stdout)?;
+
+    execute!(
+        stdout,
+        cursor::MoveUp(1),
+        terminal::Clear(terminal::ClearType::CurrentLine),
+    )?;
+
+    Ok(output)
+}
+
+fn read_and_clear_evented(
+    prompt: &str,
+    stdout: &mut io::Stdout,
+    typing_event_tx: Sender<TypingEvent>,
+    unknown_key_event_handler: impl FnMut(event::KeyCode, event::KeyModifiers) -> anyhow::Result<()>,
+) -> anyhow::Result<Option<String>> {
+    let output =
+        ui::read_input_evented(prompt, stdout, typing_event_tx, unknown_key_event_handler)?;
+
+    execute!(
+        stdout,
+        cursor::MoveUp(1),
+        terminal::Clear(terminal::ClearType::CurrentLine),
+    )?;
+
+    Ok(output)
 }

@@ -33,8 +33,9 @@ pub enum TypingEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Message {
-    pub body: String,
+pub enum Message {
+    Text { body: String },
+    File { contents: Vec<u8> },
 }
 
 #[derive(Debug, Serialize, Deserialize)]

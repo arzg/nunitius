@@ -16,9 +16,18 @@ pub(super) fn render_event(
     let local_time_occurred = local_time_occurred.format("%H:%M");
 
     match event {
-        EventKind::Message(Message { body }) => {
-            format!("[{}] {}: {}", local_time_occurred, user, body)
-        }
+        EventKind::Message(message) => match message {
+            Message::Text { body } => format!("[{}] {}: {}", local_time_occurred, user, body),
+            Message::File { contents } => format!(
+                "[{}] {} sent a file: ‘{}’",
+                local_time_occurred,
+                user,
+                String::from_utf8_lossy(contents)
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+            ),
+        },
         EventKind::Login => format!("[{}] {} logged in!", local_time_occurred, user),
         EventKind::Logout => format!("[{}] {} logged out!", local_time_occurred, user),
     }

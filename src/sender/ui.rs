@@ -7,13 +7,14 @@ use std::{fmt, thread};
 
 pub fn read_input(prompt: &str, stdout: &mut io::Stdout) -> anyhow::Result<Option<String>> {
     let (typing_event_tx, _typing_event_rx) = flume::unbounded();
-    read_input_evented(prompt, stdout, typing_event_tx)
+    read_input_evented(prompt, stdout, typing_event_tx, |_, _| Ok(()))
 }
 
 pub fn read_input_evented(
     prompt: &str,
     stdout: &mut io::Stdout,
     typing_event_tx: Sender<TypingEvent>,
+    mut unknown_key_event_handler: impl FnMut(event::KeyCode, event::KeyModifiers) -> anyhow::Result<()>,
 ) -> anyhow::Result<Option<String>> {
     let (pressed_key_tx, pressed_key_rx) = flume::bounded(0);
 
@@ -70,14 +71,17 @@ pub fn read_input_evented(
             (event::KeyCode::Char(c), event::KeyModifiers::SHIFT) => {
                 edit_buffer.add_multiple(c.to_uppercase());
             }
-            (event::KeyCode::Char(c), _) => edit_buffer.add(c),
+            (event::KeyCode::Char(c), event::KeyModifiers::NONE) => edit_buffer.add(c),
             (event::KeyCode::Enter, _) => {
                 drop(pressed_key_tx);
                 handle.join().unwrap();
                 break;
             }
             (event::KeyCode::Backspace, _) => edit_buffer.backspace(),
-            _ => continue,
+            _ => {
+                unknown_key_event_handler(code, modifiers)?;
+                continue;
+            }
         }
 
         pressed_key_tx.send(()).unwrap();

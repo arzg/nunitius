@@ -90,6 +90,20 @@ mod tests {
     }
 
     #[test]
+    fn add_text_at_cursor() {
+        let mut editor = Editor::default();
+
+        editor.add('b');
+        editor.move_left();
+        editor.add('a');
+        editor.move_right();
+        editor.add('c');
+
+        assert_eq!(editor.render(10), "abc");
+        assert_eq!(editor.cursor(), (0, 3));
+    }
+
+    #[test]
     fn backspace() {
         let mut editor = Editor::default();
 
@@ -97,6 +111,19 @@ mod tests {
         editor.backspace();
 
         assert_eq!(editor.render(10), "");
+        assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn backspace_at_cursor() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.add('b');
+        editor.move_left();
+        editor.backspace();
+
+        assert_eq!(editor.render(10), "b");
         assert_eq!(editor.cursor(), (0, 0));
     }
 
@@ -149,44 +176,6 @@ mod tests {
     }
 
     #[test]
-    fn add_text_at_cursor() {
-        let mut editor = Editor::default();
-
-        editor.add('b');
-        editor.move_left();
-        editor.add('a');
-        editor.move_right();
-        editor.add('c');
-
-        assert_eq!(editor.render(10), "abc");
-        assert_eq!(editor.cursor(), (0, 3));
-    }
-
-    #[test]
-    fn backspace_at_cursor() {
-        let mut editor = Editor::default();
-
-        editor.add('a');
-        editor.add('b');
-        editor.move_left();
-        editor.backspace();
-
-        assert_eq!(editor.render(10), "b");
-        assert_eq!(editor.cursor(), (0, 0));
-    }
-
-    #[test]
-    fn wrap_text_if_over_width_limit() {
-        let mut editor = Editor::default();
-
-        for c in "foo bar baz".chars() {
-            editor.add(c);
-        }
-
-        assert_eq!(editor.render(7), "foo bar\nbaz");
-    }
-
-    #[test]
     fn enter_at_start_of_line() {
         let mut editor = Editor::default();
 
@@ -222,5 +211,16 @@ mod tests {
 
         assert_eq!(editor.render(10), "a\nb");
         assert_eq!(editor.cursor(), (1, 0));
+    }
+
+    #[test]
+    fn wrap_text_if_over_width_limit() {
+        let mut editor = Editor::default();
+
+        for c in "foo bar baz".chars() {
+            editor.add(c);
+        }
+
+        assert_eq!(editor.render(7), "foo bar\nbaz");
     }
 }

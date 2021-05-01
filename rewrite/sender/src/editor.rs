@@ -1,56 +1,77 @@
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Editor {
-    buffer: Vec<char>,
-    cursor: usize,
+    buffer: Vec<String>,
+    line: usize,
+    column: usize,
+}
+
+impl Default for Editor {
+    fn default() -> Self {
+        Self {
+            buffer: vec![String::new()],
+            line: 0,
+            column: 0,
+        }
+    }
 }
 
 impl Editor {
     pub(crate) fn render(&self, width: usize) -> String {
-        let text: String = self.buffer.iter().collect();
+        let text: String = self.buffer.join("\n");
         textwrap::fill(&text, width)
     }
 
     pub(crate) fn cursor(&self) -> (usize, usize) {
-        (0, self.cursor)
+        (self.line, self.column)
     }
 
     pub(crate) fn add(&mut self, c: char) {
-        if self.at_end_of_buffer() {
-            self.buffer.push(c);
+        if self.at_end_of_line() {
+            self.buffer[self.line].push(c);
         } else {
-            self.buffer.insert(self.cursor, c);
+            self.buffer[self.line].insert(self.column, c);
         }
 
-        self.cursor += 1;
+        self.column += 1;
     }
 
     pub(crate) fn backspace(&mut self) {
-        if self.at_start_of_buffer() {
+        if self.at_start_of_line() {
             return;
         }
 
-        self.buffer.remove(self.cursor - 1);
-        self.cursor -= 1;
+        self.buffer[self.line].remove(self.column - 1);
+        self.column -= 1;
+    }
+
+    pub(crate) fn enter(&mut self) {
+        let after_cursor = self.buffer[self.line].split_off(self.column);
+
+        // the current line now contains everything before the cursor
+
+        self.buffer.insert(self.line + 1, after_cursor);
+        self.line += 1;
+        self.column = 0;
     }
 
     pub(crate) fn move_left(&mut self) {
-        if !self.at_start_of_buffer() {
-            self.cursor -= 1;
+        if !self.at_start_of_line() {
+            self.column -= 1;
         }
     }
 
     pub(crate) fn move_right(&mut self) {
-        if !self.at_end_of_buffer() {
-            self.cursor += 1;
+        if !self.at_end_of_line() {
+            self.column += 1;
         }
     }
 
-    fn at_start_of_buffer(&mut self) -> bool {
-        self.cursor == 0
+    fn at_start_of_line(&mut self) -> bool {
+        self.column == 0
     }
 
-    fn at_end_of_buffer(&mut self) -> bool {
-        self.cursor == self.buffer.len()
+    fn at_end_of_line(&mut self) -> bool {
+        self.buffer[self.line].len() == self.column
     }
 }
 
@@ -163,5 +184,43 @@ mod tests {
         }
 
         assert_eq!(editor.render(7), "foo bar\nbaz");
+    }
+
+    #[test]
+    fn enter_at_start_of_line() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.move_left();
+        editor.enter();
+        editor.add('b');
+
+        assert_eq!(editor.render(10), "\nba");
+        assert_eq!(editor.cursor(), (1, 1));
+    }
+
+    #[test]
+    fn enter_at_end_of_line() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.enter();
+        editor.add('b');
+
+        assert_eq!(editor.render(10), "a\nb");
+        assert_eq!(editor.cursor(), (1, 1));
+    }
+
+    #[test]
+    fn enter_in_middle_of_line() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.add('b');
+        editor.move_left();
+        editor.enter();
+
+        assert_eq!(editor.render(10), "a\nb");
+        assert_eq!(editor.cursor(), (1, 0));
     }
 }

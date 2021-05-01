@@ -21,6 +21,10 @@ impl Editor {
         textwrap::fill(&text, self.width)
     }
 
+    pub(crate) fn resize(&mut self, width: usize) {
+        self.width = width;
+    }
+
     pub(crate) fn cursor(&self) -> (usize, usize) {
         (self.line, self.column)
     }
@@ -345,5 +349,18 @@ mod tests {
         }
 
         assert_eq!(editor.render(), "foo bar\nbaz");
+    }
+
+    #[test]
+    fn resize() {
+        let mut editor = Editor::new(1);
+
+        for c in "a b".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "a\nb");
+
+        editor.resize(3);
+        assert_eq!(editor.render(), "a b");
     }
 }

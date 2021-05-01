@@ -235,38 +235,19 @@ mod tests {
     }
 
     #[test]
-    fn move_cursor_left_at_start_of_buffer() {
+    fn cursor_movement_edge_cases() {
         let mut editor = Editor::default();
 
         editor.move_left();
-
         assert_eq!(editor.cursor(), (0, 0));
-    }
-
-    #[test]
-    fn move_cursor_right_at_end_of_buffer() {
-        let mut editor = Editor::default();
 
         editor.move_right();
-
         assert_eq!(editor.cursor(), (0, 0));
-    }
-
-    #[test]
-    fn move_cursor_up_at_start_of_buffer() {
-        let mut editor = Editor::default();
 
         editor.move_up();
-
         assert_eq!(editor.cursor(), (0, 0));
-    }
-
-    #[test]
-    fn move_cursor_down_at_end_of_buffer() {
-        let mut editor = Editor::default();
 
         editor.move_down();
-
         assert_eq!(editor.cursor(), (0, 0));
     }
 

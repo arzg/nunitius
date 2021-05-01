@@ -66,12 +66,40 @@ impl Editor {
         }
     }
 
-    fn at_start_of_line(&mut self) -> bool {
+    pub(crate) fn move_up(&mut self) {
+        if !self.at_start_of_buffer() {
+            self.line -= 1;
+        }
+    }
+
+    pub(crate) fn move_down(&mut self) {
+        if !self.at_end_of_buffer() {
+            self.line += 1;
+        }
+    }
+
+    fn at_start_of_buffer(&self) -> bool {
+        self.at_first_line() && self.at_start_of_line()
+    }
+
+    fn at_end_of_buffer(&self) -> bool {
+        self.at_last_line() && self.at_end_of_line()
+    }
+
+    fn at_start_of_line(&self) -> bool {
         self.column == 0
     }
 
-    fn at_end_of_line(&mut self) -> bool {
+    fn at_end_of_line(&self) -> bool {
         self.buffer[self.line].len() == self.column
+    }
+
+    fn at_first_line(&self) -> bool {
+        self.line == 0
+    }
+
+    fn at_last_line(&self) -> bool {
+        self.line == self.buffer.len() || self.buffer.len() == 1
     }
 }
 
@@ -158,6 +186,29 @@ mod tests {
     }
 
     #[test]
+    fn move_cursor_up() {
+        let mut editor = Editor::default();
+
+        editor.enter();
+        editor.move_up();
+
+        assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn move_cursor_down() {
+        let mut editor = Editor::default();
+
+        editor.enter();
+        editor.enter();
+        editor.move_up();
+        editor.move_up();
+        editor.move_down();
+
+        assert_eq!(editor.cursor(), (1, 0));
+    }
+
+    #[test]
     fn move_cursor_left_at_start_of_buffer() {
         let mut editor = Editor::default();
 
@@ -171,6 +222,24 @@ mod tests {
         let mut editor = Editor::default();
 
         editor.move_right();
+
+        assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn move_cursor_up_at_start_of_buffer() {
+        let mut editor = Editor::default();
+
+        editor.move_up();
+
+        assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn move_cursor_down_at_end_of_buffer() {
+        let mut editor = Editor::default();
+
+        editor.move_down();
 
         assert_eq!(editor.cursor(), (0, 0));
     }

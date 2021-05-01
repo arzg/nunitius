@@ -55,15 +55,31 @@ impl Editor {
     }
 
     pub(crate) fn move_left(&mut self) {
-        if !self.at_start_of_line() {
-            self.column -= 1;
+        if self.at_start_of_buffer() {
+            return;
         }
+
+        if self.at_start_of_line() {
+            self.line -= 1;
+            self.column = self.buffer[self.line].len();
+            return;
+        }
+
+        self.column -= 1;
     }
 
     pub(crate) fn move_right(&mut self) {
-        if !self.at_end_of_line() {
-            self.column += 1;
+        if self.at_end_of_buffer() {
+            return;
         }
+
+        if self.at_end_of_line() {
+            self.line += 1;
+            self.column = 0;
+            return;
+        }
+
+        self.column += 1;
     }
 
     pub(crate) fn move_up(&mut self) {
@@ -242,6 +258,30 @@ mod tests {
         editor.move_down();
 
         assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn wrap_cursor_around_at_start_of_line() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.enter();
+        editor.move_left();
+
+        assert_eq!(editor.cursor(), (0, 1));
+    }
+
+    #[test]
+    fn wrap_cursor_around_at_end_of_line() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.enter();
+        editor.add('b');
+        editor.move_up();
+        editor.move_right();
+
+        assert_eq!(editor.cursor(), (1, 0));
     }
 
     #[test]

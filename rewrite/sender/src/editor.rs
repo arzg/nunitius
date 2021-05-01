@@ -61,7 +61,7 @@ impl Editor {
 
         if self.at_start_of_line() {
             self.line -= 1;
-            self.column = self.buffer[self.line].len();
+            self.move_to_end_of_line();
             return;
         }
 
@@ -83,15 +83,25 @@ impl Editor {
     }
 
     pub(crate) fn move_up(&mut self) {
-        if !self.at_start_of_buffer() {
-            self.line -= 1;
+        if self.at_first_line() {
+            self.column = 0;
+            return;
         }
+
+        self.line -= 1;
     }
 
     pub(crate) fn move_down(&mut self) {
-        if !self.at_end_of_buffer() {
-            self.line += 1;
+        if self.at_last_line() {
+            self.move_to_end_of_line();
+            return;
         }
+
+        self.line += 1;
+    }
+
+    fn move_to_end_of_line(&mut self) {
+        self.column = self.buffer[self.line].len();
     }
 
     fn at_start_of_buffer(&self) -> bool {
@@ -282,6 +292,29 @@ mod tests {
         editor.move_right();
 
         assert_eq!(editor.cursor(), (1, 0));
+    }
+
+    #[test]
+    fn move_to_start_of_line_if_at_top_when_moving_up() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.add('b');
+        editor.move_up();
+
+        assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn move_to_end_of_line_if_at_bottom_when_moving_down() {
+        let mut editor = Editor::default();
+
+        editor.add('a');
+        editor.add('b');
+        editor.move_left();
+        editor.move_down();
+
+        assert_eq!(editor.cursor(), (0, 2));
     }
 
     #[test]

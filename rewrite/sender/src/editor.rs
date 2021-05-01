@@ -3,22 +3,22 @@ pub(crate) struct Editor {
     buffer: Vec<String>,
     line: usize,
     column: usize,
+    width: usize,
 }
 
-impl Default for Editor {
-    fn default() -> Self {
+impl Editor {
+    pub(crate) fn new(width: usize) -> Self {
         Self {
             buffer: vec![String::new()],
             line: 0,
             column: 0,
+            width,
         }
     }
-}
 
-impl Editor {
-    pub(crate) fn render(&self, width: usize) -> String {
+    pub(crate) fn render(&self) -> String {
         let text: String = self.buffer.join("\n");
-        textwrap::fill(&text, width)
+        textwrap::fill(&text, self.width)
     }
 
     pub(crate) fn cursor(&self) -> (usize, usize) {
@@ -135,17 +135,17 @@ mod tests {
 
     #[test]
     fn add_text() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('c');
 
-        assert_eq!(editor.render(10), "c");
+        assert_eq!(editor.render(), "c");
         assert_eq!(editor.cursor(), (0, 1));
     }
 
     #[test]
     fn add_text_at_cursor() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('b');
         editor.move_left();
@@ -153,43 +153,43 @@ mod tests {
         editor.move_right();
         editor.add('c');
 
-        assert_eq!(editor.render(10), "abc");
+        assert_eq!(editor.render(), "abc");
         assert_eq!(editor.cursor(), (0, 3));
     }
 
     #[test]
     fn backspace() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.backspace();
 
-        assert_eq!(editor.render(10), "");
+        assert_eq!(editor.render(), "");
         assert_eq!(editor.cursor(), (0, 0));
     }
 
     #[test]
     fn backspace_at_cursor() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.add('b');
         editor.move_left();
         editor.backspace();
 
-        assert_eq!(editor.render(10), "b");
+        assert_eq!(editor.render(), "b");
         assert_eq!(editor.cursor(), (0, 0));
     }
 
     #[test]
     fn backspace_at_start_of_buffer() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
         editor.backspace();
     }
 
     #[test]
     fn move_cursor_left() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.move_left();
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn move_cursor_right() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.add('b');
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn move_cursor_up() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.enter();
         editor.move_up();
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn move_cursor_down() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.enter();
         editor.enter();
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn cursor_movement_edge_cases() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.move_left();
         assert_eq!(editor.cursor(), (0, 0));
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn wrap_cursor_around_at_start_of_line() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.enter();
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn wrap_cursor_around_at_end_of_line() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.enter();
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn move_to_start_of_line_if_at_top_when_moving_up() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.add('b');
@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn move_to_end_of_line_if_at_bottom_when_moving_down() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.add('b');
@@ -300,50 +300,50 @@ mod tests {
 
     #[test]
     fn enter_at_start_of_line() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.move_left();
         editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(10), "\nba");
+        assert_eq!(editor.render(), "\nba");
         assert_eq!(editor.cursor(), (1, 1));
     }
 
     #[test]
     fn enter_at_end_of_line() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(10), "a\nb");
+        assert_eq!(editor.render(), "a\nb");
         assert_eq!(editor.cursor(), (1, 1));
     }
 
     #[test]
     fn enter_in_middle_of_line() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.add('b');
         editor.move_left();
         editor.enter();
 
-        assert_eq!(editor.render(10), "a\nb");
+        assert_eq!(editor.render(), "a\nb");
         assert_eq!(editor.cursor(), (1, 0));
     }
 
     #[test]
     fn wrap_text_if_over_width_limit() {
-        let mut editor = Editor::default();
+        let mut editor = Editor::new(7);
 
         for c in "foo bar baz".chars() {
             editor.add(c);
         }
 
-        assert_eq!(editor.render(7), "foo bar\nbaz");
+        assert_eq!(editor.render(), "foo bar\nbaz");
     }
 }

@@ -232,19 +232,23 @@ impl Editor {
     fn move_to(&mut self, idx: usize) {
         self.line = 0;
         self.column = 0;
-        let mut bytes_stepped = 0;
+        let mut elems_stepped = 0;
 
         'outer: for line in &self.buffer {
-            if bytes_stepped == idx {
+            if elems_stepped == idx {
                 break 'outer;
             }
 
-            for _ in line.as_bytes() {
-                self.column += 1;
-                bytes_stepped += 1;
+            if line.is_empty() {
+                elems_stepped += 1;
+            } else {
+                for _ in line.as_bytes() {
+                    self.column += 1;
+                    elems_stepped += 1;
 
-                if bytes_stepped == idx {
-                    break 'outer;
+                    if elems_stepped == idx {
+                        break 'outer;
+                    }
                 }
             }
 
@@ -262,11 +266,18 @@ impl Editor {
     }
 
     fn cursor_idx(&self) -> usize {
-        self.buffer[..self.line]
+        let num_bytes_before_cursor = self.buffer[..self.line]
             .iter()
             .map(String::len)
             .sum::<usize>()
-            + self.column
+            + self.column;
+
+        let num_empty_lines_before_cursor = self.buffer[..self.line]
+            .iter()
+            .filter(|line| line.is_empty())
+            .count();
+
+        num_bytes_before_cursor + num_empty_lines_before_cursor
     }
 
     fn at_end_of_buffer(&self) -> bool {

@@ -73,12 +73,20 @@ impl Editor {
     }
 
     pub(crate) fn enter(&mut self) {
+        if self.at_start_of_line() {
+            self.buffer.insert(self.line, String::new());
+            self.line += 1;
+            return;
+        }
+
         let after_cursor = self.buffer[self.line].split_off(self.column);
 
         // the current line now contains everything before the cursor
 
         self.buffer.insert(self.line + 1, after_cursor);
-        self.line += 1;
+        self.buffer.insert(self.line + 1, String::new());
+
+        self.line += 2;
         self.column = 0;
     }
 
@@ -365,7 +373,6 @@ mod tests {
 
         editor.add('a');
         editor.enter();
-        editor.enter();
         editor.add('b');
         editor.move_left();
         editor.backspace();
@@ -379,7 +386,6 @@ mod tests {
         let mut editor = Editor::new(10);
 
         editor.add('a');
-        editor.enter();
         editor.enter();
         editor.enter();
         editor.add('b');
@@ -462,7 +468,7 @@ mod tests {
         editor.enter();
         editor.move_left();
 
-        assert_eq!(editor.cursor(), (0, 1));
+        assert_eq!(editor.cursor(), (1, 0));
     }
 
     #[test]
@@ -470,7 +476,6 @@ mod tests {
         let mut editor = Editor::new(10);
 
         editor.add('a');
-        editor.enter();
         editor.enter();
         editor.add('b');
         editor.move_up();
@@ -522,7 +527,6 @@ mod tests {
 
         editor.add('a');
         editor.enter();
-        editor.enter();
         editor.add('b');
 
         assert_eq!(editor.render(), "a\n\nb");
@@ -538,8 +542,8 @@ mod tests {
         editor.move_left();
         editor.enter();
 
-        assert_eq!(editor.render(), "a\nb");
-        assert_eq!(editor.cursor(), (1, 0));
+        assert_eq!(editor.render(), "a\n\nb");
+        assert_eq!(editor.cursor(), (2, 0));
     }
 
     #[test]

@@ -5,4 +5,3 @@ name = "nunitius-sender"
 version = "0.1.0"
 
 [dependencies]
-textwrap = "0.13.4"

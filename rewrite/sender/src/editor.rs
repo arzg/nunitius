@@ -1,7 +1,7 @@
 mod wrap;
 use wrap::wrap;
 
-use std::ops::RangeInclusive;
+use std::ops::Range;
 
 #[derive(Debug)]
 pub(crate) struct Editor {
@@ -27,6 +27,7 @@ impl Editor {
 
     pub(crate) fn resize(&mut self, width: usize) {
         self.width = width;
+        self.rewrap();
     }
 
     pub(crate) fn cursor(&self) -> (usize, usize) {
@@ -110,6 +111,25 @@ impl Editor {
         self.line += 1;
     }
 
+    fn rewrap(&mut self) {
+        let cursor_idx = self.cursor_idx();
+        let para_idxs = self.para_idxs();
+
+        for para_idx in para_idxs {
+            let para = &self.buffer[para_idx.clone()];
+            let wrapped = wrap(para.iter().map(|s| s.as_str()), self.width);
+
+            // remove existing non-rewrapped paragraph
+            drop(self.buffer.drain(para_idx.clone()));
+
+            for (idx, line) in wrapped.into_iter().enumerate() {
+                self.buffer.insert(para_idx.start + idx, line);
+            }
+        }
+
+        self.move_to(cursor_idx);
+    }
+
     fn rewrap_current_para(&mut self) {
         let current_para_idx = self.current_para_idx();
 
@@ -125,16 +145,49 @@ impl Editor {
         drop(self.buffer.drain(current_para_idx.clone()));
 
         for (idx, line) in wrapped.into_iter().enumerate() {
-            self.buffer.insert(current_para_idx.start() + idx, line);
+            self.buffer.insert(current_para_idx.start + idx, line);
         }
 
         self.move_to(cursor_idx);
     }
 
-    fn current_para_idx(&self) -> RangeInclusive<usize> {
+    fn para_idxs(&self) -> Vec<Range<usize>> {
+        let para_separators: Vec<_> = self
+            .buffer
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx))
+            .collect();
+
+        let mut para_idxs: Vec<_> = para_separators
+            .windows(2)
+            .map(|separators| {
+                let start = separators[0] + 1;
+                let end = separators[1];
+
+                start..end
+            })
+            .collect();
+
+        if para_separators.is_empty() {
+            para_idxs.push(0..self.buffer.len());
+        } else {
+            if para_separators[0] != 0 {
+                para_idxs.insert(0, 0..para_separators[0]);
+            }
+
+            if *para_separators.last().unwrap() != self.buffer.len() {
+                para_idxs.push(para_separators.last().unwrap() + 1..self.buffer.len());
+            }
+        }
+
+        para_idxs
+    }
+
+    fn current_para_idx(&self) -> Range<usize> {
         let on_paragraph_separator = Self::is_line_para_separator(&self.buffer[self.line]);
         if on_paragraph_separator {
-            return self.line..=self.line;
+            return self.line..self.line + 1;
         }
 
         // both of these include the current line
@@ -149,10 +202,10 @@ impl Editor {
             .unwrap_or(0);
 
         let end_line_idx = lines_below_cursor
-            .find_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx - 1))
-            .unwrap_or(self.buffer.len() - 1);
+            .find_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx))
+            .unwrap_or(self.buffer.len());
 
-        start_line_idx..=end_line_idx
+        start_line_idx..end_line_idx
     }
 
     fn is_line_para_separator(line: &str) -> bool {
@@ -443,15 +496,15 @@ mod tests {
 
     #[test]
     fn resize() {
-        let mut editor = Editor::new(1);
+        let mut editor = Editor::new(4);
 
-        for c in "a b".chars() {
+        for c in "foo bar".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "a\n \nb");
+        assert_eq!(editor.render(), "foo \nbar");
 
-        editor.resize(3);
-        assert_eq!(editor.render(), "a b");
+        editor.resize(7);
+        assert_eq!(editor.render(), "foo bar");
     }
 
     #[test]

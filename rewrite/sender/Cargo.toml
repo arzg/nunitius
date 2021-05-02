@@ -5,3 +5,5 @@ name = "nunitius-sender"
 version = "0.1.0"
 
 [dependencies]
+anyhow = "1.0"
+crossterm = "0.19.0"

@@ -1,3 +1,8 @@
+mod wrap;
+use wrap::wrap;
+
+use std::ops::RangeInclusive;
+
 #[derive(Debug)]
 pub(crate) struct Editor {
     buffer: Vec<String>,
@@ -17,8 +22,7 @@ impl Editor {
     }
 
     pub(crate) fn render(&self) -> String {
-        let text: String = self.buffer.join("\n");
-        textwrap::fill(&text, self.width)
+        self.buffer.join("\n")
     }
 
     pub(crate) fn resize(&mut self, width: usize) {
@@ -37,6 +41,7 @@ impl Editor {
         }
 
         self.column += 1;
+        self.rewrap_current_para();
     }
 
     pub(crate) fn backspace(&mut self) {
@@ -46,6 +51,7 @@ impl Editor {
 
         self.buffer[self.line].remove(self.column - 1);
         self.column -= 1;
+        self.rewrap_current_para();
     }
 
     pub(crate) fn enter(&mut self) {
@@ -102,6 +108,81 @@ impl Editor {
         }
 
         self.line += 1;
+    }
+
+    fn rewrap_current_para(&mut self) {
+        let current_para_idx = self.current_para_idx();
+
+        let current_para = self.buffer[current_para_idx.clone()]
+            .iter()
+            .map(|s| s.as_str());
+
+        let wrapped = wrap(current_para, self.width);
+
+        let mut new_line = *current_para_idx.start();
+        let mut new_column = 0;
+        let mut bytes_stepped = 0;
+        let current_pos_in_para = self.buffer[*current_para_idx.start()..self.line]
+            .iter()
+            .map(String::len)
+            .sum::<usize>()
+            + self.column;
+
+        'outer: for line in &wrapped {
+            if bytes_stepped == current_pos_in_para {
+                break 'outer;
+            }
+
+            for _ in line.as_bytes() {
+                new_column += 1;
+                bytes_stepped += 1;
+
+                if bytes_stepped == current_pos_in_para {
+                    break 'outer;
+                }
+            }
+
+            new_line += 1;
+            new_column = 0;
+        }
+
+        self.line = new_line;
+        self.column = new_column;
+
+        // remove current para
+        drop(self.buffer.drain(current_para_idx.clone()));
+
+        for (idx, line) in wrapped.into_iter().enumerate() {
+            self.buffer.insert(current_para_idx.start() + idx, line);
+        }
+    }
+
+    fn current_para_idx(&self) -> RangeInclusive<usize> {
+        let on_paragraph_separator = Self::is_line_para_separator(&self.buffer[self.line]);
+        if on_paragraph_separator {
+            return self.line..=self.line;
+        }
+
+        // both of these include the current line
+        let lines_above_cursor = self.buffer.iter().enumerate().take(self.line + 1);
+        let mut lines_below_cursor = self.buffer.iter().enumerate().skip(self.line);
+
+        // the output doesn’t include paragraph separators
+
+        let start_line_idx = lines_above_cursor
+            .rev()
+            .find_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx + 1))
+            .unwrap_or(0);
+
+        let end_line_idx = lines_below_cursor
+            .find_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx - 1))
+            .unwrap_or(self.buffer.len() - 1);
+
+        start_line_idx..=end_line_idx
+    }
+
+    fn is_line_para_separator(line: &str) -> bool {
+        line.is_empty() || line.chars().all(char::is_whitespace)
     }
 
     fn move_to_end_of_line(&mut self) {
@@ -272,7 +353,9 @@ mod tests {
 
         editor.add('a');
         editor.enter();
+        editor.enter();
         editor.add('b');
+        editor.move_up();
         editor.move_up();
         editor.move_right();
 
@@ -321,10 +404,11 @@ mod tests {
 
         editor.add('a');
         editor.enter();
+        editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(), "a\nb");
-        assert_eq!(editor.cursor(), (1, 1));
+        assert_eq!(editor.render(), "a\n\nb");
+        assert_eq!(editor.cursor(), (2, 1));
     }
 
     #[test]
@@ -342,13 +426,13 @@ mod tests {
 
     #[test]
     fn wrap_text_if_over_width_limit() {
-        let mut editor = Editor::new(7);
+        let mut editor = Editor::new(8);
 
         for c in "foo bar baz".chars() {
             editor.add(c);
         }
 
-        assert_eq!(editor.render(), "foo bar\nbaz");
+        assert_eq!(editor.render(), "foo bar \nbaz");
     }
 
     #[test]
@@ -358,9 +442,35 @@ mod tests {
         for c in "a b".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "a\nb");
+        assert_eq!(editor.render(), "a\n \nb");
 
         editor.resize(3);
         assert_eq!(editor.render(), "a b");
+    }
+
+    #[test]
+    fn rewrap_when_adding_text() {
+        let mut editor = Editor::new(2);
+
+        editor.add('a');
+        editor.add('b');
+        assert_eq!(editor.cursor(), (0, 2));
+
+        editor.add('c');
+        assert_eq!(editor.cursor(), (1, 1));
+    }
+
+    #[test]
+    fn rewrap_when_backspacing() {
+        let mut editor = Editor::new(5);
+
+        for c in "foo bar".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "foo \nbar");
+
+        editor.backspace();
+        editor.backspace();
+        assert_eq!(editor.render(), "foo b");
     }
 }

@@ -125,6 +125,7 @@ impl Editor {
         }
 
         self.line -= 1;
+        self.clamp();
     }
 
     pub(crate) fn move_down(&mut self) {
@@ -134,6 +135,7 @@ impl Editor {
         }
 
         self.line += 1;
+        self.clamp();
     }
 
     fn rewrap(&mut self) {
@@ -267,6 +269,10 @@ impl Editor {
 
     fn move_to_end_of_line(&mut self) {
         self.column = self.buffer[self.line].len();
+    }
+
+    fn clamp(&mut self) {
+        self.column = self.column.min(self.buffer[self.line].len());
     }
 
     fn at_start_of_buffer(&self) -> bool {
@@ -481,6 +487,7 @@ mod tests {
         editor.move_up();
         editor.move_up();
         editor.move_right();
+        editor.move_right();
 
         assert_eq!(editor.cursor(), (1, 0));
     }
@@ -506,6 +513,25 @@ mod tests {
         editor.move_down();
 
         assert_eq!(editor.cursor(), (0, 2));
+    }
+
+    #[test]
+    fn clamp_cursor_to_line_when_moving_up_and_down() {
+        let mut editor = Editor::new(4);
+
+        for c in "abc d efg".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "abc \nd \nefg");
+        assert_eq!(editor.cursor(), (2, 3));
+
+        editor.move_up();
+        assert_eq!(editor.cursor(), (1, 2));
+
+        editor.move_up();
+        editor.move_right();
+        editor.move_down();
+        assert_eq!(editor.cursor(), (1, 2));
     }
 
     #[test]

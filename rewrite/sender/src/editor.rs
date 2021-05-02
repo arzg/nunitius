@@ -119,35 +119,7 @@ impl Editor {
 
         let wrapped = wrap(current_para, self.width);
 
-        let mut new_line = *current_para_idx.start();
-        let mut new_column = 0;
-        let mut bytes_stepped = 0;
-        let current_pos_in_para = self.buffer[*current_para_idx.start()..self.line]
-            .iter()
-            .map(String::len)
-            .sum::<usize>()
-            + self.column;
-
-        'outer: for line in &wrapped {
-            if bytes_stepped == current_pos_in_para {
-                break 'outer;
-            }
-
-            for _ in line.as_bytes() {
-                new_column += 1;
-                bytes_stepped += 1;
-
-                if bytes_stepped == current_pos_in_para {
-                    break 'outer;
-                }
-            }
-
-            new_line += 1;
-            new_column = 0;
-        }
-
-        self.line = new_line;
-        self.column = new_column;
+        let cursor_idx = self.cursor_idx();
 
         // remove current para
         drop(self.buffer.drain(current_para_idx.clone()));
@@ -155,6 +127,8 @@ impl Editor {
         for (idx, line) in wrapped.into_iter().enumerate() {
             self.buffer.insert(current_para_idx.start() + idx, line);
         }
+
+        self.move_to(cursor_idx);
     }
 
     fn current_para_idx(&self) -> RangeInclusive<usize> {
@@ -185,12 +159,44 @@ impl Editor {
         line.is_empty() || line.chars().all(char::is_whitespace)
     }
 
+    fn move_to(&mut self, idx: usize) {
+        self.line = 0;
+        self.column = 0;
+        let mut bytes_stepped = 0;
+
+        'outer: for line in &self.buffer {
+            if bytes_stepped == idx {
+                break 'outer;
+            }
+
+            for _ in line.as_bytes() {
+                self.column += 1;
+                bytes_stepped += 1;
+
+                if bytes_stepped == idx {
+                    break 'outer;
+                }
+            }
+
+            self.line += 1;
+            self.column = 0;
+        }
+    }
+
     fn move_to_end_of_line(&mut self) {
         self.column = self.buffer[self.line].len();
     }
 
     fn at_start_of_buffer(&self) -> bool {
         self.at_first_line() && self.at_start_of_line()
+    }
+
+    fn cursor_idx(&self) -> usize {
+        self.buffer[..self.line]
+            .iter()
+            .map(String::len)
+            .sum::<usize>()
+            + self.column
     }
 
     fn at_end_of_buffer(&self) -> bool {

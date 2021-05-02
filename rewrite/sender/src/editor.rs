@@ -46,13 +46,30 @@ impl Editor {
     }
 
     pub(crate) fn backspace(&mut self) {
+        if self.at_start_of_buffer() {
+            return;
+        }
+
         if self.at_start_of_line() {
+            self.join_lines();
             return;
         }
 
         self.buffer[self.line].remove(self.column - 1);
         self.column -= 1;
         self.rewrap_current_para();
+    }
+
+    fn join_lines(&mut self) {
+        self.line -= 1;
+        self.move_to_end_of_line();
+
+        let line = self.buffer.remove(self.line + 1);
+        self.buffer[self.line].push_str(&line);
+
+        if !self.current_para_idx().is_empty() {
+            self.rewrap_current_para();
+        }
     }
 
     pub(crate) fn enter(&mut self) {
@@ -269,7 +286,7 @@ impl Editor {
     }
 
     fn at_last_line(&self) -> bool {
-        self.line == self.buffer.len() || self.buffer.len() == 1
+        self.line == self.buffer.len() - 1 || self.buffer.len() == 1
     }
 }
 
@@ -329,6 +346,37 @@ mod tests {
     fn backspace_at_start_of_buffer() {
         let mut editor = Editor::new(10);
         editor.backspace();
+    }
+
+    #[test]
+    fn backspace_at_start_of_line() {
+        let mut editor = Editor::new(10);
+
+        editor.add('a');
+        editor.enter();
+        editor.enter();
+        editor.add('b');
+        editor.move_left();
+        editor.backspace();
+
+        assert_eq!(editor.render(), "ab");
+        assert_eq!(editor.cursor(), (0, 1));
+    }
+
+    #[test]
+    fn backspace_at_start_of_line_with_empty_line_above() {
+        let mut editor = Editor::new(10);
+
+        editor.add('a');
+        editor.enter();
+        editor.enter();
+        editor.enter();
+        editor.add('b');
+        editor.move_left();
+        editor.backspace();
+
+        assert_eq!(editor.render(), "a\n\nb");
+        assert_eq!(editor.cursor(), (2, 0));
     }
 
     #[test]

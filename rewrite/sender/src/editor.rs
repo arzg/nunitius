@@ -1,11 +1,15 @@
+mod para;
 mod wrap;
+
+use para::Paragraph;
 use wrap::wrap;
 
-use std::ops::Range;
+use itertools::Itertools;
 
 #[derive(Debug)]
 pub(crate) struct Editor {
-    buffer: Vec<String>,
+    buffer: Vec<Paragraph>,
+    para_idx: usize,
     line: usize,
     column: usize,
     width: usize,
@@ -14,7 +18,8 @@ pub(crate) struct Editor {
 impl Editor {
     pub(crate) fn new(width: usize) -> Self {
         Self {
-            buffer: vec![String::new()],
+            buffer: vec![Paragraph::default()],
+            para_idx: 0,
             line: 0,
             column: 0,
             width,
@@ -22,7 +27,10 @@ impl Editor {
     }
 
     pub(crate) fn render(&self) -> String {
-        self.buffer.join("\n")
+        self.buffer
+            .iter()
+            .map(|para| para.lines().join("\n"))
+            .join("\n\n")
     }
 
     pub(crate) fn resize(&mut self, width: usize) {
@@ -31,16 +39,22 @@ impl Editor {
     }
 
     pub(crate) fn cursor(&self) -> (usize, usize) {
-        (self.line, self.column)
+        let num_lines_in_paras_above_cursor: usize = self.buffer[..self.para_idx]
+            .iter()
+            .map(Paragraph::num_lines)
+            .sum();
+
+        // paragraph breaks are rendered one line high
+        let num_para_breaks_above_cursor = self.para_idx;
+
+        (
+            num_lines_in_paras_above_cursor + num_para_breaks_above_cursor + self.line,
+            self.column,
+        )
     }
 
     pub(crate) fn add(&mut self, c: char) {
-        if self.at_end_of_line() {
-            self.buffer[self.line].push(c);
-        } else {
-            self.buffer[self.line].insert(self.column, c);
-        }
-
+        self.buffer[self.para_idx].insert(c, self.line, self.column);
         self.column += 1;
         self.rewrap_current_para();
     }
@@ -50,44 +64,49 @@ impl Editor {
             return;
         }
 
-        if self.at_start_of_line() {
-            self.join_lines();
+        if self.at_start_of_para() {
+            self.join_paras();
             return;
         }
 
-        self.buffer[self.line].remove(self.column - 1);
+        if self.at_start_of_line() {
+            self.move_up();
+            self.move_to_end_of_line();
+        }
+
+        self.buffer[self.para_idx].remove(self.line, self.column - 1);
         self.column -= 1;
         self.rewrap_current_para();
     }
 
-    fn join_lines(&mut self) {
-        self.line -= 1;
-        self.move_to_end_of_line();
+    fn join_paras(&mut self) {
+        self.para_idx -= 1;
+        self.move_to_end_of_para();
 
-        let line = self.buffer.remove(self.line + 1);
-        self.buffer[self.line].push_str(&line);
+        let para = self.buffer.remove(self.para_idx + 1);
+        self.buffer[self.para_idx].join(para);
 
-        if !self.current_para_idx().is_empty() {
-            self.rewrap_current_para();
-        }
+        self.rewrap_current_para();
     }
 
     pub(crate) fn enter(&mut self) {
         if self.at_start_of_line() {
-            self.buffer.insert(self.line, String::new());
-            self.line += 1;
+            self.buffer.insert(self.para_idx, Paragraph::default());
+            self.line = 0;
+            self.para_idx += 1;
             return;
         }
 
-        let after_cursor = self.buffer[self.line].split_off(self.column);
+        let after_cursor = self.buffer[self.para_idx].split_off(self.line, self.column);
 
-        // the current line now contains everything before the cursor
+        // the current paragraph now contains everything before the cursor
 
-        self.buffer.insert(self.line + 1, after_cursor);
-        self.buffer.insert(self.line + 1, String::new());
-
-        self.line += 2;
+        self.buffer.insert(self.para_idx + 1, after_cursor);
+        self.line = 0;
         self.column = 0;
+        self.para_idx += 1;
+
+        self.rewrap_current_para();
     }
 
     pub(crate) fn move_left(&mut self) {
@@ -96,7 +115,7 @@ impl Editor {
         }
 
         if self.at_start_of_line() {
-            self.line -= 1;
+            self.move_up();
             self.move_to_end_of_line();
             return;
         }
@@ -110,7 +129,7 @@ impl Editor {
         }
 
         if self.at_end_of_line() {
-            self.line += 1;
+            self.move_down();
             self.column = 0;
             return;
         }
@@ -124,6 +143,12 @@ impl Editor {
             return;
         }
 
+        if self.at_first_line_of_para() {
+            self.para_idx -= 1;
+            self.move_to_last_line_of_para();
+            return;
+        }
+
         self.line -= 1;
         self.clamp();
     }
@@ -134,168 +159,69 @@ impl Editor {
             return;
         }
 
+        if self.at_last_line_of_para() {
+            self.para_idx += 1;
+            self.line = 0;
+            return;
+        }
+
         self.line += 1;
         self.clamp();
     }
 
     fn rewrap(&mut self) {
-        let cursor_idx = self.cursor_idx();
-        let para_idxs = self.para_idxs();
+        let para_cursor_idx = self.save_para_cursor_idx();
 
-        for para_idx in para_idxs {
-            let para = &self.buffer[para_idx.clone()];
-            let wrapped = wrap(para.iter().map(|s| s.as_str()), self.width);
-
-            // remove existing non-rewrapped paragraph
-            drop(self.buffer.drain(para_idx.clone()));
-
-            for (idx, line) in wrapped.into_iter().enumerate() {
-                self.buffer.insert(para_idx.start + idx, line);
-            }
+        for para in &mut self.buffer {
+            para.rewrap(self.width);
         }
 
-        self.move_to(cursor_idx);
+        self.restore_para_cursor_pos(para_cursor_idx);
     }
 
     fn rewrap_current_para(&mut self) {
-        let current_para_idx = self.current_para_idx();
-
-        let current_para = self.buffer[current_para_idx.clone()]
-            .iter()
-            .map(|s| s.as_str());
-
-        let wrapped = wrap(current_para, self.width);
-
-        let cursor_idx = self.cursor_idx();
-
-        // remove current para
-        drop(self.buffer.drain(current_para_idx.clone()));
-
-        for (idx, line) in wrapped.into_iter().enumerate() {
-            self.buffer.insert(current_para_idx.start + idx, line);
-        }
-
-        self.move_to(cursor_idx);
+        let para_cursor_idx = self.save_para_cursor_idx();
+        self.buffer[self.para_idx].rewrap(self.width);
+        self.restore_para_cursor_pos(para_cursor_idx);
     }
 
-    fn para_idxs(&self) -> Vec<Range<usize>> {
-        let para_separators: Vec<_> = self
-            .buffer
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx))
-            .collect();
-
-        let mut para_idxs: Vec<_> = para_separators
-            .windows(2)
-            .map(|separators| {
-                let start = separators[0] + 1;
-                let end = separators[1];
-
-                start..end
-            })
-            .collect();
-
-        if para_separators.is_empty() {
-            para_idxs.push(0..self.buffer.len());
-        } else {
-            if para_separators[0] != 0 {
-                para_idxs.insert(0, 0..para_separators[0]);
-            }
-
-            if *para_separators.last().unwrap() != self.buffer.len() {
-                para_idxs.push(para_separators.last().unwrap() + 1..self.buffer.len());
-            }
-        }
-
-        para_idxs
+    fn save_para_cursor_idx(&mut self) -> usize {
+        self.buffer[self.para_idx].idx_of_coords(self.line, self.column)
     }
 
-    fn current_para_idx(&self) -> Range<usize> {
-        let on_paragraph_separator = Self::is_line_para_separator(&self.buffer[self.line]);
-        if on_paragraph_separator {
-            return self.line..self.line + 1;
-        }
-
-        // both of these include the current line
-        let lines_above_cursor = self.buffer.iter().enumerate().take(self.line + 1);
-        let mut lines_below_cursor = self.buffer.iter().enumerate().skip(self.line);
-
-        // the output doesn’t include paragraph separators
-
-        let start_line_idx = lines_above_cursor
-            .rev()
-            .find_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx + 1))
-            .unwrap_or(0);
-
-        let end_line_idx = lines_below_cursor
-            .find_map(|(idx, line)| Self::is_line_para_separator(line).then(|| idx))
-            .unwrap_or(self.buffer.len());
-
-        start_line_idx..end_line_idx
+    fn restore_para_cursor_pos(&mut self, para_cursor_idx: usize) {
+        let (line, column) = self.buffer[self.para_idx].coords_of_idx(para_cursor_idx);
+        self.line = line;
+        self.column = column;
     }
 
-    fn is_line_para_separator(line: &str) -> bool {
-        line.is_empty() || line.chars().all(char::is_whitespace)
+    fn move_to_end_of_para(&mut self) {
+        self.move_to_last_line_of_para();
+        self.move_to_end_of_line();
     }
 
-    fn move_to(&mut self, idx: usize) {
-        self.line = 0;
-        self.column = 0;
-        let mut elems_stepped = 0;
-
-        'outer: for line in &self.buffer {
-            if elems_stepped == idx {
-                break 'outer;
-            }
-
-            if line.is_empty() {
-                elems_stepped += 1;
-            } else {
-                for _ in line.as_bytes() {
-                    self.column += 1;
-                    elems_stepped += 1;
-
-                    if elems_stepped == idx {
-                        break 'outer;
-                    }
-                }
-            }
-
-            self.line += 1;
-            self.column = 0;
-        }
+    fn move_to_last_line_of_para(&mut self) {
+        self.line = self.buffer[self.para_idx].num_lines() - 1;
     }
 
     fn move_to_end_of_line(&mut self) {
-        self.column = self.buffer[self.line].len();
+        self.column = self.buffer[self.para_idx][self.line].len();
     }
 
     fn clamp(&mut self) {
-        self.column = self.column.min(self.buffer[self.line].len());
+        self.column = self.column.min(self.buffer[self.para_idx][self.line].len());
     }
 
     fn at_start_of_buffer(&self) -> bool {
         self.at_first_line() && self.at_start_of_line()
     }
 
-    fn cursor_idx(&self) -> usize {
-        let num_bytes_before_cursor = self.buffer[..self.line]
-            .iter()
-            .map(String::len)
-            .sum::<usize>()
-            + self.column;
-
-        let num_empty_lines_before_cursor = self.buffer[..self.line]
-            .iter()
-            .filter(|line| line.is_empty())
-            .count();
-
-        num_bytes_before_cursor + num_empty_lines_before_cursor
-    }
-
     fn at_end_of_buffer(&self) -> bool {
         self.at_last_line() && self.at_end_of_line()
+    }
+
+    fn at_start_of_para(&self) -> bool {
+        self.at_first_line_of_para() && self.at_start_of_line()
     }
 
     fn at_start_of_line(&self) -> bool {
@@ -303,15 +229,31 @@ impl Editor {
     }
 
     fn at_end_of_line(&self) -> bool {
-        self.buffer[self.line].len() == self.column
+        self.buffer[self.para_idx][self.line].len() == self.column
     }
 
     fn at_first_line(&self) -> bool {
-        self.line == 0
+        self.at_first_line_of_para() && self.at_first_para()
     }
 
     fn at_last_line(&self) -> bool {
-        self.line == self.buffer.len() - 1 || self.buffer.len() == 1
+        self.at_last_line_of_para() && self.at_last_para()
+    }
+
+    fn at_first_line_of_para(&self) -> bool {
+        self.line == 0
+    }
+
+    fn at_last_line_of_para(&self) -> bool {
+        self.line == self.buffer[self.para_idx].num_lines() - 1
+    }
+
+    fn at_first_para(&self) -> bool {
+        self.para_idx == 0
+    }
+
+    fn at_last_para(&self) -> bool {
+        self.para_idx == self.buffer.len() - 1
     }
 }
 
@@ -375,31 +317,30 @@ mod tests {
 
     #[test]
     fn backspace_at_start_of_line() {
-        let mut editor = Editor::new(10);
+        let mut editor = Editor::new(1);
 
         editor.add('a');
-        editor.enter();
         editor.add('b');
         editor.move_left();
         editor.backspace();
 
-        assert_eq!(editor.render(), "ab");
-        assert_eq!(editor.cursor(), (0, 1));
+        assert_eq!(editor.render(), "b");
+        assert_eq!(editor.cursor(), (0, 0));
     }
 
     #[test]
-    fn backspace_at_start_of_line_with_empty_line_above() {
-        let mut editor = Editor::new(10);
+    fn backspace_at_start_of_para() {
+        let mut editor = Editor::new(1);
 
         editor.add('a');
-        editor.enter();
-        editor.enter();
         editor.add('b');
+        editor.enter();
+        editor.add('c');
         editor.move_left();
         editor.backspace();
 
-        assert_eq!(editor.render(), "a\n\nb");
-        assert_eq!(editor.cursor(), (2, 0));
+        assert_eq!(editor.render(), "a\nb\nc");
+        assert_eq!(editor.cursor(), (1, 1));
     }
 
     #[test]
@@ -446,7 +387,7 @@ mod tests {
         editor.move_up();
         editor.move_down();
 
-        assert_eq!(editor.cursor(), (1, 0));
+        assert_eq!(editor.cursor(), (2, 0));
     }
 
     #[test]
@@ -468,28 +409,58 @@ mod tests {
 
     #[test]
     fn wrap_cursor_around_at_start_of_line() {
+        let mut editor = Editor::new(4);
+
+        for c in "foo bar".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "foo \nbar");
+
+        for _ in 0..4 {
+            editor.move_left();
+        }
+
+        assert_eq!(editor.cursor(), (0, 4));
+    }
+
+    #[test]
+    fn wrap_cursor_around_at_start_of_para() {
         let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.enter();
         editor.move_left();
 
-        assert_eq!(editor.cursor(), (1, 0));
+        assert_eq!(editor.cursor(), (0, 1));
     }
 
     #[test]
     fn wrap_cursor_around_at_end_of_line() {
+        let mut editor = Editor::new(4);
+
+        for c in "foo bar".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "foo \nbar");
+
+        editor.move_up();
+        editor.move_right();
+        editor.move_right();
+
+        assert_eq!(editor.cursor(), (1, 0));
+    }
+
+    #[test]
+    fn wrap_cursor_around_at_end_of_para() {
         let mut editor = Editor::new(10);
 
         editor.add('a');
         editor.enter();
         editor.add('b');
         editor.move_up();
-        editor.move_up();
-        editor.move_right();
         editor.move_right();
 
-        assert_eq!(editor.cursor(), (1, 0));
+        assert_eq!(editor.cursor(), (2, 0));
     }
 
     #[test]
@@ -543,8 +514,8 @@ mod tests {
         editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(), "\nba");
-        assert_eq!(editor.cursor(), (1, 1));
+        assert_eq!(editor.render(), "\n\nba");
+        assert_eq!(editor.cursor(), (2, 1));
     }
 
     #[test]
@@ -620,5 +591,22 @@ mod tests {
         editor.backspace();
         editor.backspace();
         assert_eq!(editor.render(), "foo b");
+    }
+
+    #[test]
+    fn rewrap_when_splitting_paragraphs() {
+        let mut editor = Editor::new(8);
+
+        for c in "foo bar baz quux".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "foo bar \nbaz quux");
+
+        for _ in 0..13 {
+            editor.move_left();
+        }
+        editor.enter();
+
+        assert_eq!(editor.render(), "foo \n\nbar baz \nquux");
     }
 }

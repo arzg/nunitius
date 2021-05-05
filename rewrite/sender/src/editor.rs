@@ -609,4 +609,19 @@ mod tests {
 
         assert_eq!(editor.render(), "foo \n\nbar baz \nquux");
     }
+
+    #[test]
+    fn join_words_when_deleting_trailing_space() {
+        let mut editor = Editor::new(8);
+
+        for c in "foo bar baz quux".chars() {
+            editor.add(c);
+        }
+        assert_eq!(editor.render(), "foo bar \nbaz quux");
+
+        editor.move_up();
+        editor.backspace();
+
+        assert_eq!(editor.render(), "foo \nbarbaz \nquux");
+    }
 }

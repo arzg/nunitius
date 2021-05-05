@@ -1,10 +1,8 @@
-pub(super) fn wrap<'a>(text: impl Iterator<Item = &'a str>, width: usize) -> Vec<String> {
-    let words = text.flat_map(|text| split_into_words(text, width));
-
+pub(super) fn wrap(text: &str, width: usize) -> Vec<String> {
     let mut lines = vec![String::new()];
     let mut current_line = 0;
 
-    for word in words {
+    for word in split_into_words(text, width) {
         if lines[current_line].len() + word.len() > width {
             lines.push(word.to_string());
             current_line += 1;

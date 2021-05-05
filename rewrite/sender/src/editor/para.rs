@@ -16,7 +16,7 @@ impl Default for Paragraph {
 
 impl Paragraph {
     pub(super) fn rewrap(&mut self, width: usize) {
-        let wrapped = wrap(self.lines.iter().map(|s| s.as_str()), width);
+        let wrapped = wrap(&self.lines.join(""), width);
         self.lines = wrapped;
     }
 

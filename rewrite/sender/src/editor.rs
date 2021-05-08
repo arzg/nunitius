@@ -146,10 +146,10 @@ impl Editor {
         if self.at_first_line_of_para() {
             self.para_idx -= 1;
             self.move_to_last_line_of_para();
-            return;
+        } else {
+            self.line -= 1;
         }
 
-        self.line -= 1;
         self.clamp();
     }
 
@@ -162,10 +162,10 @@ impl Editor {
         if self.at_last_line_of_para() {
             self.para_idx += 1;
             self.line = 0;
-            return;
+        } else {
+            self.line += 1;
         }
 
-        self.line += 1;
         self.clamp();
     }
 
@@ -503,6 +503,39 @@ mod tests {
         editor.move_right();
         editor.move_down();
         assert_eq!(editor.cursor(), (1, 2));
+    }
+
+    #[test]
+    fn clamp_cursor_to_para_when_moving_up() {
+        let mut editor = Editor::new(2);
+
+        editor.add('a');
+        editor.enter();
+        editor.add('b');
+        editor.add('c');
+        assert_eq!(editor.render(), "a\n\nbc");
+        assert_eq!(editor.cursor(), (2, 2));
+
+        editor.move_up();
+        assert_eq!(editor.cursor(), (0, 1));
+    }
+
+    #[test]
+    fn clamp_cursor_to_para_when_moving_down() {
+        let mut editor = Editor::new(2);
+
+        editor.add('a');
+        editor.add('b');
+        editor.enter();
+        editor.add('c');
+        assert_eq!(editor.render(), "ab\n\nc");
+
+        editor.move_left();
+        editor.move_left();
+        assert_eq!(editor.cursor(), (0, 2));
+
+        editor.move_down();
+        assert_eq!(editor.cursor(), (2, 1));
     }
 
     #[test]

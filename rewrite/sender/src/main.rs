@@ -9,8 +9,8 @@ fn main() -> anyhow::Result<()> {
 
     let mut stdout = io::stdout();
 
-    let (terminal_width, _) = terminal::size()?;
-    let mut editor = editor::Editor::new((terminal_width - 1).into());
+    let (terminal_width, terminal_height) = terminal::size()?;
+    let mut editor = editor::Editor::new((terminal_width - 1).into(), terminal_height.into());
 
     loop {
         render(&editor, &mut stdout)?;
@@ -28,7 +28,10 @@ fn main() -> anyhow::Result<()> {
                 (event::KeyCode::Right, _) => editor.move_right(),
                 _ => {}
             },
-            event::Event::Resize(new_width, _) => editor.resize((new_width - 1).into()),
+            event::Event::Resize(new_width, new_height) => {
+                editor.resize_width((new_width - 1).into());
+                editor.resize_height(new_height.into());
+            }
             _ => {}
         }
     }

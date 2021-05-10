@@ -72,8 +72,8 @@ impl Paragraph {
         self.lines[line].remove(column);
     }
 
-    pub(super) fn lines(&self) -> impl Iterator<Item = &str> {
-        self.lines.iter().map(|l| l.as_str())
+    pub(super) fn lines(&self) -> Lines<'_> {
+        Lines::new(self)
     }
 
     pub(super) fn num_lines(&self) -> usize {
@@ -86,6 +86,32 @@ impl Index<usize> for Paragraph {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.lines[index]
+    }
+}
+
+pub(super) struct Lines<'a> {
+    para: &'a Paragraph,
+    line_idx: usize,
+}
+
+impl<'a> Lines<'a> {
+    fn new(para: &'a Paragraph) -> Self {
+        Self { para, line_idx: 0 }
+    }
+}
+
+impl<'a> Iterator for Lines<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.line_idx >= self.para.num_lines() {
+            return None;
+        }
+
+        let line = &self.para[self.line_idx];
+        self.line_idx += 1;
+
+        Some(line)
     }
 }
 

@@ -6,8 +6,6 @@ use para::{Lines, Paragraph};
 use render::Renderer;
 use wrap::wrap;
 
-use itertools::Itertools;
-
 #[derive(Debug)]
 pub(crate) struct Editor {
     buffer: Vec<Paragraph>,
@@ -32,14 +30,20 @@ impl Editor {
         }
     }
 
-    pub(crate) fn render(&self) -> String {
-        let mut lines = self.render_entire_buffer();
+    pub(crate) fn render(&self) -> Vec<&str> {
+        let lines = self.render_entire_buffer();
 
         if self.can_entire_document_fit_on_screen() {
-            return lines.join("\n");
+            let output: Vec<_> = lines.collect();
+            assert_eq!(output.len(), self.num_visual_lines());
+
+            return output;
         }
 
-        lines.skip(self.lines_scrolled).take(self.height).join("\n")
+        let output: Vec<_> = lines.skip(self.lines_scrolled).take(self.height).collect();
+        assert_eq!(output.len(), self.height);
+
+        output
     }
 
     fn render_entire_buffer(&self) -> impl Iterator<Item = &str> {
@@ -335,7 +339,7 @@ mod tests {
 
         editor.add('c');
 
-        assert_eq!(editor.render(), "c");
+        assert_eq!(editor.render(), ["c"]);
         assert_eq!(editor.cursor(), (0, 1));
     }
 
@@ -349,7 +353,7 @@ mod tests {
         editor.move_right();
         editor.add('c');
 
-        assert_eq!(editor.render(), "abc");
+        assert_eq!(editor.render(), ["abc"]);
         assert_eq!(editor.cursor(), (0, 3));
     }
 
@@ -360,7 +364,7 @@ mod tests {
         editor.add('a');
         editor.backspace();
 
-        assert_eq!(editor.render(), "");
+        assert_eq!(editor.render(), [""]);
         assert_eq!(editor.cursor(), (0, 0));
     }
 
@@ -373,7 +377,7 @@ mod tests {
         editor.move_left();
         editor.backspace();
 
-        assert_eq!(editor.render(), "b");
+        assert_eq!(editor.render(), ["b"]);
         assert_eq!(editor.cursor(), (0, 0));
     }
 
@@ -392,7 +396,7 @@ mod tests {
         editor.move_left();
         editor.backspace();
 
-        assert_eq!(editor.render(), "b");
+        assert_eq!(editor.render(), ["b"]);
         assert_eq!(editor.cursor(), (0, 0));
     }
 
@@ -407,7 +411,7 @@ mod tests {
         editor.move_left();
         editor.backspace();
 
-        assert_eq!(editor.render(), "a\nb\nc");
+        assert_eq!(editor.render(), ["a", "b", "c"]);
         assert_eq!(editor.cursor(), (1, 1));
     }
 
@@ -482,7 +486,7 @@ mod tests {
         for c in "foo bar".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "foo \nbar");
+        assert_eq!(editor.render(), ["foo ", "bar"]);
 
         for _ in 0..4 {
             editor.move_left();
@@ -509,7 +513,7 @@ mod tests {
         for c in "foo bar".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "foo \nbar");
+        assert_eq!(editor.render(), ["foo ", "bar"]);
 
         editor.move_up();
         editor.move_right();
@@ -561,7 +565,7 @@ mod tests {
         for c in "abc d efg".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "abc \nd \nefg");
+        assert_eq!(editor.render(), ["abc ", "d ", "efg"]);
         assert_eq!(editor.cursor(), (2, 3));
 
         editor.move_up();
@@ -581,7 +585,7 @@ mod tests {
         editor.enter();
         editor.add('b');
         editor.add('c');
-        assert_eq!(editor.render(), "a\n\nbc");
+        assert_eq!(editor.render(), ["a", "", "bc"]);
         assert_eq!(editor.cursor(), (2, 2));
 
         editor.move_up();
@@ -596,7 +600,7 @@ mod tests {
         editor.add('b');
         editor.enter();
         editor.add('c');
-        assert_eq!(editor.render(), "ab\n\nc");
+        assert_eq!(editor.render(), ["ab", "", "c"]);
 
         editor.move_left();
         editor.move_left();
@@ -615,7 +619,7 @@ mod tests {
         editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(), "\n\nba");
+        assert_eq!(editor.render(), ["", "", "ba"]);
         assert_eq!(editor.cursor(), (2, 1));
     }
 
@@ -627,7 +631,7 @@ mod tests {
         editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(), "a\n\nb");
+        assert_eq!(editor.render(), ["a", "", "b"]);
         assert_eq!(editor.cursor(), (2, 1));
     }
 
@@ -640,7 +644,7 @@ mod tests {
         editor.move_left();
         editor.enter();
 
-        assert_eq!(editor.render(), "a\n\nb");
+        assert_eq!(editor.render(), ["a", "", "b"]);
         assert_eq!(editor.cursor(), (2, 0));
     }
 
@@ -652,7 +656,7 @@ mod tests {
             editor.add(c);
         }
 
-        assert_eq!(editor.render(), "foo bar \nbaz");
+        assert_eq!(editor.render(), ["foo bar ", "baz"]);
     }
 
     #[test]
@@ -662,10 +666,10 @@ mod tests {
         for c in "foo bar".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "foo \nbar");
+        assert_eq!(editor.render(), ["foo ", "bar"]);
 
         editor.resize_width(7);
-        assert_eq!(editor.render(), "foo bar");
+        assert_eq!(editor.render(), ["foo bar"]);
     }
 
     #[test]
@@ -687,11 +691,11 @@ mod tests {
         for c in "foo bar".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "foo \nbar");
+        assert_eq!(editor.render(), ["foo ", "bar"]);
 
         editor.backspace();
         editor.backspace();
-        assert_eq!(editor.render(), "foo b");
+        assert_eq!(editor.render(), ["foo b"]);
     }
 
     #[test]
@@ -701,14 +705,14 @@ mod tests {
         for c in "foo bar baz quux".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "foo bar \nbaz quux");
+        assert_eq!(editor.render(), ["foo bar ", "baz quux"]);
 
         for _ in 0..13 {
             editor.move_left();
         }
         editor.enter();
 
-        assert_eq!(editor.render(), "foo \n\nbar baz \nquux");
+        assert_eq!(editor.render(), ["foo ", "", "bar baz ", "quux"]);
     }
 
     #[test]
@@ -718,12 +722,12 @@ mod tests {
         for c in "foo bar baz quux".chars() {
             editor.add(c);
         }
-        assert_eq!(editor.render(), "foo bar \nbaz quux");
+        assert_eq!(editor.render(), ["foo bar ", "baz quux"]);
 
         editor.move_up();
         editor.backspace();
 
-        assert_eq!(editor.render(), "foo \nbarbaz \nquux");
+        assert_eq!(editor.render(), ["foo ", "barbaz ", "quux"]);
     }
 
     #[test]
@@ -732,11 +736,11 @@ mod tests {
 
         editor.add('a');
         editor.add('b');
-        assert_eq!(editor.render(), "a\nb");
+        assert_eq!(editor.render(), ["a", "b"]);
         assert_eq!(editor.cursor(), (1, 1));
 
         editor.add('c');
-        assert_eq!(editor.render(), "b\nc");
+        assert_eq!(editor.render(), ["b", "c"]);
         assert_eq!(editor.cursor(), (1, 1));
     }
 
@@ -748,7 +752,7 @@ mod tests {
         editor.enter();
         editor.add('b');
 
-        assert_eq!(editor.render(), "\nb");
+        assert_eq!(editor.render(), ["", "b"]);
         assert_eq!(editor.cursor(), (1, 1));
     }
 
@@ -759,7 +763,7 @@ mod tests {
         editor.enter();
         editor.enter();
 
-        assert_eq!(editor.render(), "\n");
+        assert_eq!(editor.render(), ["", ""]);
         assert_eq!(editor.cursor(), (1, 0));
     }
 
@@ -773,7 +777,7 @@ mod tests {
         editor.move_up();
         editor.move_up();
 
-        assert_eq!(editor.render(), "a\nb");
+        assert_eq!(editor.render(), ["a", "b"]);
         assert_eq!(editor.cursor(), (0, 1));
     }
 
@@ -786,13 +790,13 @@ mod tests {
         editor.add('c');
         editor.move_up();
         editor.move_up();
-        assert_eq!(editor.render(), "a\nb");
+        assert_eq!(editor.render(), ["a", "b"]);
         assert_eq!(editor.cursor(), (0, 1));
 
         editor.move_down();
         editor.move_down();
 
-        assert_eq!(editor.render(), "b\nc");
+        assert_eq!(editor.render(), ["b", "c"]);
         assert_eq!(editor.cursor(), (1, 1));
     }
 
@@ -803,11 +807,11 @@ mod tests {
         editor.add('a');
         editor.add('b');
         editor.add('c');
-        assert_eq!(editor.render(), "b\nc");
+        assert_eq!(editor.render(), ["b", "c"]);
         assert_eq!(editor.cursor(), (1, 1));
 
         editor.backspace();
-        assert_eq!(editor.render(), "a\nb");
+        assert_eq!(editor.render(), ["a", "b"]);
         assert_eq!(editor.cursor(), (1, 1));
     }
 
@@ -817,11 +821,11 @@ mod tests {
 
         editor.add('a');
         editor.enter();
-        assert_eq!(editor.render(), "\n");
+        assert_eq!(editor.render(), ["", ""]);
         assert_eq!(editor.cursor(), (1, 0));
 
         editor.backspace();
-        assert_eq!(editor.render(), "a");
+        assert_eq!(editor.render(), ["a"]);
         assert_eq!(editor.cursor(), (0, 1));
     }
 
@@ -832,11 +836,11 @@ mod tests {
         editor.add('a');
         editor.add('b');
         editor.add('c');
-        assert_eq!(editor.render(), "b\nc");
+        assert_eq!(editor.render(), ["b", "c"]);
         assert_eq!(editor.cursor(), (1, 1));
 
         editor.resize_width(3);
-        assert_eq!(editor.render(), "abc");
+        assert_eq!(editor.render(), ["abc"]);
         assert_eq!(editor.cursor(), (0, 3));
     }
 
@@ -847,11 +851,11 @@ mod tests {
         editor.add('a');
         editor.add('b');
         editor.add('c');
-        assert_eq!(editor.render(), "b\nc");
+        assert_eq!(editor.render(), ["b", "c"]);
         assert_eq!(editor.cursor(), (1, 1));
 
         editor.resize_height(3);
-        assert_eq!(editor.render(), "a\nb\nc");
+        assert_eq!(editor.render(), ["a", "b", "c"]);
         assert_eq!(editor.cursor(), (2, 1));
     }
 }

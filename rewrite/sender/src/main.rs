@@ -48,11 +48,7 @@ fn render(editor: &editor::Editor, stdout: &mut io::Stdout) -> anyhow::Result<()
         cursor::MoveTo(0, 0)
     )?;
 
-    write!(
-        stdout,
-        "{}",
-        editor.render().lines().collect::<Vec<_>>().join("\r\n")
-    )?;
+    write!(stdout, "{}", editor.render().join("\r\n"))?;
 
     let (line, column) = editor.cursor();
     let line = line.try_into().unwrap();

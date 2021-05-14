@@ -1,11 +1,9 @@
 [package]
 authors = ["Aramis Razzaghipour <aramisnoah@gmail.com>"]
 edition = "2018"
-name = "nunitius-sender"
+name = "text"
 version = "0.1.0"
 
 [dependencies]
-anyhow = "1.0"
-crossterm = "0.19.0"
-text = {path = "../text"}
+unicode-segmentation = "1.7"
 unicode-width = "0.1.8"

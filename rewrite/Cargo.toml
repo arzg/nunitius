@@ -1,2 +1,7 @@
 [workspace]
-members = ["viewer", "sender", "server"]
+members = [
+  "viewer",
+  "text",
+  "server",
+  "sender",
+]

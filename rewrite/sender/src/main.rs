@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
         match event {
             event::Event::Key(event::KeyEvent { code, modifiers }) => match (code, modifiers) {
                 (event::KeyCode::Char('c'), event::KeyModifiers::CONTROL) => break,
-                (event::KeyCode::Char(c), _) => editor.add(c),
+                (event::KeyCode::Char(c), _) => editor.add(&c.to_string()),
                 (event::KeyCode::Backspace, _) => editor.backspace(),
                 (event::KeyCode::Enter, _) => editor.enter(),
                 (event::KeyCode::Up, _) => editor.move_up(),

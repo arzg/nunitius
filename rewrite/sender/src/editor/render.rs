@@ -1,4 +1,5 @@
 use super::{Lines, Paragraph};
+use text::Text;
 
 pub(super) enum Renderer<'a, I>
 where
@@ -33,9 +34,9 @@ impl<'a, I> Iterator for Renderer<'a, I>
 where
     I: Iterator<Item = &'a Paragraph>,
 {
-    type Item = &'a str;
+    type Item = Text<'a>;
 
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<Self::Item> {
         let (paras, current_para_lines) = match self {
             Self::HasParas {
                 paras,
@@ -55,6 +56,6 @@ where
         // we’ve reached the end of the paragraph,
         // so we return an empty line,
         // since paragraph breaks are one line long
-        Some("")
+        Some(Text::default())
     }
 }

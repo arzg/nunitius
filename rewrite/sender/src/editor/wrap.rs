@@ -1,35 +1,41 @@
-pub(super) fn wrap(text: &str, width: usize) -> Vec<String> {
-    let mut lines = vec![String::new()];
+use text::{Text, TextBuf};
+use unicode_width::UnicodeWidthStr;
+
+pub(super) fn wrap(text: Text<'_>, width: usize) -> Vec<TextBuf> {
+    let mut lines = vec![TextBuf::default()];
     let mut current_line = 0;
 
     for word in split_into_words(text, width) {
-        if lines[current_line].len() + word.len() > width {
-            lines.push(word.to_string());
+        if lines[current_line].width() + word.width() > width {
+            lines.push(word.into_text_buf());
             current_line += 1;
         } else {
-            lines[current_line].push_str(word);
+            lines[current_line].push(word.as_str());
         }
     }
 
     lines
 }
 
-fn split_into_words(text: &str, width: usize) -> impl Iterator<Item = &str> {
+fn split_into_words(text: Text<'_>, width: usize) -> impl Iterator<Item = Text<'_>> {
     WordSplitter {
         text,
-        pos: 0,
+        grapheme_pos: 0,
+        visual_pos: 0,
         width,
     }
 }
 
+#[derive(Debug)]
 struct WordSplitter<'a> {
-    text: &'a str,
-    pos: usize,
+    text: Text<'a>,
+    grapheme_pos: usize,
+    visual_pos: usize,
     width: usize,
 }
 
 impl<'a> Iterator for WordSplitter<'a> {
-    type Item = &'a str;
+    type Item = Text<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.at_end() {
@@ -38,26 +44,59 @@ impl<'a> Iterator for WordSplitter<'a> {
 
         let next_word_boundary = self
             .current_text()
-            .find(' ')
+            .find(" ")
             .map_or_else(|| self.current_text().len(), |space_idx| space_idx + 1);
 
         let word = if next_word_boundary > self.width {
-            &self.current_text()[..self.width]
+            self.chunk()
         } else {
-            &self.current_text()[..next_word_boundary]
+            self.current_text().slice(..next_word_boundary)
         };
 
-        self.pos += word.len();
+        self.grapheme_pos += word.len();
+        self.visual_pos += word.width();
+
         Some(word)
     }
 }
 
 impl<'a> WordSplitter<'a> {
-    fn current_text(&self) -> &'a str {
-        &self.text[self.pos..]
+    /// Returns text with a width between 1 and `self.width`.
+    fn chunk(&self) -> Text<'a> {
+        let mut num_graphemes = 1;
+        let mut text;
+
+        loop {
+            // step forward one grapheme
+            num_graphemes += 1;
+            text = self.current_text().slice(..num_graphemes);
+
+            let is_too_wide = text.width() > self.width;
+            if is_too_wide {
+                // step back one grapheme
+                num_graphemes -= 1;
+                text = self.current_text().slice(..num_graphemes);
+
+                break;
+            }
+
+            let none_left = num_graphemes == self.text.len();
+            if none_left {
+                break;
+            }
+        }
+
+        assert!(text.width() > 0);
+        assert!(text.width() <= self.width);
+
+        text
+    }
+
+    fn current_text(&self) -> Text<'a> {
+        self.text.slice(self.grapheme_pos..)
     }
 
     fn at_end(&self) -> bool {
-        self.pos == self.text.len()
+        self.visual_pos == self.text.width()
     }
 }

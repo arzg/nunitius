@@ -242,8 +242,10 @@ impl Editor {
             self.lines_scrolled = 0;
         } else if self.cursor_above_top() {
             self.scroll_cursor_to_top();
-        } else if self.cursor_below_bottom() || self.scrolled_past_bottom() {
+        } else if self.cursor_below_bottom() {
             self.scroll_cursor_to_bottom();
+        } else if self.scrolled_past_bottom() {
+            self.scroll_buffer_to_bottom();
         }
     }
 
@@ -253,6 +255,10 @@ impl Editor {
 
     fn scroll_cursor_to_bottom(&mut self) {
         self.lines_scrolled = self.visual_line() - self.height + 1;
+    }
+
+    fn scroll_buffer_to_bottom(&mut self) {
+        self.lines_scrolled = self.num_visual_lines() - self.height;
     }
 
     fn cursor_above_top(&self) -> bool {
@@ -796,16 +802,25 @@ mod tests {
 
     #[test]
     fn scroll_up_to_fill_entire_screen_when_paras_are_deleted() {
-        let mut editor = Editor::new(1, 2);
+        let mut editor = Editor::new(1, 5);
 
         editor.add("a");
         editor.enter();
-        assert_eq!(editor.render(), ["", ""]);
-        assert_eq!(editor.cursor(), (1, 0));
+        editor.add("b");
+        editor.enter();
+        editor.add("c");
+        editor.enter();
+        editor.add("d");
+        editor.enter();
+        editor.add("e");
+        assert_eq!(editor.render(), ["c", "", "d", "", "e"]);
+        assert_eq!(editor.cursor(), (4, 1));
 
+        editor.move_up();
         editor.backspace();
-        assert_eq!(editor.render(), ["a"]);
-        assert_eq!(editor.cursor(), (0, 1));
+        editor.backspace();
+        assert_eq!(editor.render(), ["b", "", "c", "", "e"]);
+        assert_eq!(editor.cursor(), (2, 1));
     }
 
     #[test]

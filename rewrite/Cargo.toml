@@ -1,7 +1,11 @@
 [workspace]
 members = [
-  "viewer",
-  "text",
-  "server",
+  "model",
+  "sender-protocol",
   "sender",
+  "server-protocol",
+  "server",
+  "text",
+  "viewer-protocol",
+  "viewer",
 ]

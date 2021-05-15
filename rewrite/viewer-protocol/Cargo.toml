@@ -1,0 +1,12 @@
+[package]
+authors = ["Aramis Razzaghipour <aramisnoah@gmail.com>"]
+edition = "2018"
+name = "viewer-protocol"
+version = "0.1.0"
+
+[dependencies]
+anyhow = "1.0"
+flume = {version = "0.10.5", default_features = false}
+jsonl = "4.0"
+model = {path = "../model"}
+never = "0.1.0"

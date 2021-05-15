@@ -1,0 +1,10 @@
+[package]
+authors = ["Aramis Razzaghipour <aramisnoah@gmail.com>"]
+edition = "2018"
+name = "sender-protocol"
+version = "0.1.0"
+
+[dependencies]
+anyhow = "1.0"
+jsonl = "4.0"
+model = {path = "../model"}

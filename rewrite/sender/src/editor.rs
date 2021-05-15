@@ -2,6 +2,7 @@ mod para;
 mod render;
 mod wrap;
 
+use itertools::Itertools;
 use para::{Lines, Paragraph};
 use render::Renderer;
 use text::Text;
@@ -46,6 +47,10 @@ impl Editor {
         assert_eq!(output.len(), self.height);
 
         output
+    }
+
+    pub(crate) fn contents(&self) -> String {
+        self.render_entire_buffer().join("\n")
     }
 
     fn render_entire_buffer(&self) -> impl Iterator<Item = &str> {
@@ -888,5 +893,16 @@ mod tests {
 
         assert_eq!(editor.render(), [""]);
         assert_eq!(editor.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn contents() {
+        let mut editor = Editor::new(10, 10);
+
+        editor.add("foo");
+        editor.enter();
+        editor.add("bar");
+
+        assert_eq!(editor.contents(), "foo\n\nbar");
     }
 }

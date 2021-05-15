@@ -1,4 +1,5 @@
 mod editor;
+mod text_field;
 
 use crossterm::{cursor, event, queue, terminal};
 use std::convert::TryInto;

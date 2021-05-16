@@ -10,7 +10,7 @@ use unicode_width::UnicodeWidthStr;
 use wrap::wrap;
 
 #[derive(Debug)]
-pub(crate) struct Editor {
+pub struct Editor {
     buffer: Vec<Paragraph>,
     para_idx: usize,
     line: usize,
@@ -21,7 +21,7 @@ pub(crate) struct Editor {
 }
 
 impl Editor {
-    pub(crate) fn new(width: usize, height: usize) -> Self {
+    pub fn new(width: usize, height: usize) -> Self {
         Self {
             buffer: vec![Paragraph::default()],
             para_idx: 0,
@@ -33,7 +33,7 @@ impl Editor {
         }
     }
 
-    pub(crate) fn render(&self) -> Vec<&str> {
+    pub fn render(&self) -> Vec<&str> {
         let lines = self.render_entire_buffer();
 
         if self.can_entire_document_fit_on_screen() {
@@ -49,7 +49,7 @@ impl Editor {
         output
     }
 
-    pub(crate) fn contents(&self) -> String {
+    pub fn contents(&self) -> String {
         self.render_entire_buffer().join("\n")
     }
 
@@ -57,24 +57,24 @@ impl Editor {
         Renderer::new(self.buffer.iter()).map(|text| text.as_str())
     }
 
-    pub(crate) fn resize_width(&mut self, width: usize) {
+    pub fn resize_width(&mut self, width: usize) {
         self.width = width;
         self.rewrap();
     }
 
-    pub(crate) fn resize_height(&mut self, height: usize) {
+    pub fn resize_height(&mut self, height: usize) {
         self.height = height;
         self.adjust_scroll();
     }
 
-    pub(crate) fn cursor(&self) -> (usize, usize) {
+    pub fn cursor(&self) -> (usize, usize) {
         (
             self.visual_line() - self.lines_scrolled,
             self.visual_column(),
         )
     }
 
-    pub(crate) fn add(&mut self, s: &str) {
+    pub fn add(&mut self, s: &str) {
         self.buffer[self.para_idx].insert(s, self.line, self.column);
 
         let text = Text::new(s);
@@ -83,7 +83,7 @@ impl Editor {
         self.rewrap_current_para();
     }
 
-    pub(crate) fn backspace(&mut self) {
+    pub fn backspace(&mut self) {
         if self.at_start_of_buffer() {
             return;
         }
@@ -113,7 +113,7 @@ impl Editor {
         self.rewrap_current_para();
     }
 
-    pub(crate) fn enter(&mut self) {
+    pub fn enter(&mut self) {
         if self.at_start_of_line() {
             self.buffer.insert(self.para_idx, Paragraph::default());
             self.line = 0;
@@ -136,7 +136,7 @@ impl Editor {
         self.rewrap_current_para();
     }
 
-    pub(crate) fn move_left(&mut self) {
+    pub fn move_left(&mut self) {
         if self.at_start_of_buffer() {
             return;
         }
@@ -150,7 +150,7 @@ impl Editor {
         self.column -= 1;
     }
 
-    pub(crate) fn move_right(&mut self) {
+    pub fn move_right(&mut self) {
         if self.at_end_of_buffer() {
             return;
         }
@@ -164,7 +164,7 @@ impl Editor {
         self.column += 1;
     }
 
-    pub(crate) fn move_up(&mut self) {
+    pub fn move_up(&mut self) {
         if self.at_first_line() {
             self.column = 0;
             return;
@@ -181,7 +181,7 @@ impl Editor {
         self.adjust_scroll();
     }
 
-    pub(crate) fn move_down(&mut self) {
+    pub fn move_down(&mut self) {
         if self.at_last_line() {
             self.move_to_end_of_line();
             return;

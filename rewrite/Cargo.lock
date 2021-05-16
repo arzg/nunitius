@@ -173,9 +173,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crossterm",
- "itertools",
- "text",
- "unicode-width",
+ "ui",
 ]
 
 [[package]]
@@ -373,6 +371,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "text",
+ "unicode-width",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@ members = [
   "server-protocol",
   "server",
   "text",
+  "ui",
   "viewer-protocol",
   "viewer",
 ]

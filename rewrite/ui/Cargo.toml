@@ -1,10 +1,10 @@
 [package]
 authors = ["Aramis Razzaghipour <aramisnoah@gmail.com>"]
 edition = "2018"
-name = "nunitius-sender"
+name = "ui"
 version = "0.1.0"
 
 [dependencies]
-anyhow = "1.0"
-crossterm = "0.19.0"
-ui = {path = "../ui"}
+itertools = "0.10.0"
+text = {path = "../text"}
+unicode-width = "0.1.8"

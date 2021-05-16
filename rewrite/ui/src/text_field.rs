@@ -2,7 +2,7 @@ use text::{Text, TextBuf};
 use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug)]
-pub(crate) struct TextField {
+pub struct TextField {
     buffer: TextBuf,
     cursor: usize,
     amount_scrolled: usize,
@@ -10,7 +10,7 @@ pub(crate) struct TextField {
 }
 
 impl TextField {
-    pub(crate) fn new(width: usize) -> Self {
+    pub fn new(width: usize) -> Self {
         Self {
             buffer: TextBuf::default(),
             cursor: 0,
@@ -19,7 +19,7 @@ impl TextField {
         }
     }
 
-    pub(crate) fn render(&self) -> &str {
+    pub fn render(&self) -> &str {
         if self.can_all_text_fit_on_screen() {
             return self.buffer.as_str();
         }
@@ -29,21 +29,21 @@ impl TextField {
             .as_str()
     }
 
-    pub(crate) fn contents(&self) -> &str {
+    pub fn contents(&self) -> &str {
         self.buffer.as_str()
     }
 
-    pub(crate) fn cursor(&self) -> usize {
+    pub fn cursor(&self) -> usize {
         let text_before_cursor = self.buffer.slice(..self.cursor - self.amount_scrolled);
         text_before_cursor.width()
     }
 
-    pub(crate) fn resize(&mut self, width: usize) {
+    pub fn resize(&mut self, width: usize) {
         self.width = width;
         self.adjust_scroll();
     }
 
-    pub(crate) fn add(&mut self, s: &str) {
+    pub fn add(&mut self, s: &str) {
         self.buffer.insert(self.cursor, s);
 
         let text = Text::new(s);
@@ -52,7 +52,7 @@ impl TextField {
         self.adjust_scroll();
     }
 
-    pub(crate) fn backspace(&mut self) {
+    pub fn backspace(&mut self) {
         if self.at_start() {
             return;
         }
@@ -63,7 +63,7 @@ impl TextField {
         self.adjust_scroll();
     }
 
-    pub(crate) fn move_left(&mut self) {
+    pub fn move_left(&mut self) {
         if self.at_start() {
             return;
         }
@@ -72,7 +72,7 @@ impl TextField {
         self.adjust_scroll();
     }
 
-    pub(crate) fn move_right(&mut self) {
+    pub fn move_right(&mut self) {
         if self.at_end() {
             return;
         }
@@ -81,12 +81,12 @@ impl TextField {
         self.adjust_scroll();
     }
 
-    pub(crate) fn move_up(&mut self) {
+    pub fn move_up(&mut self) {
         self.cursor = 0;
         self.adjust_scroll();
     }
 
-    pub(crate) fn move_down(&mut self) {
+    pub fn move_down(&mut self) {
         self.cursor = self.buffer.len();
         self.adjust_scroll();
     }

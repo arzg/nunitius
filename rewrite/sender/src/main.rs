@@ -1,10 +1,8 @@
-mod editor;
-mod text_field;
-
 use crossterm::{cursor, event, queue, terminal};
 use std::convert::TryInto;
 use std::env;
 use std::io::{self, Write};
+use ui::{Editor, TextField};
 
 fn main() -> anyhow::Result<()> {
     if let Some(subcommand) = env::args().nth(1) {
@@ -34,7 +32,7 @@ fn run_text_field() -> anyhow::Result<String> {
     let mut stdout = io::stdout();
 
     let (terminal_width, _) = terminal::size()?;
-    let mut text_field = text_field::TextField::new((terminal_width - 1).into());
+    let mut text_field = TextField::new((terminal_width - 1).into());
 
     loop {
         render_text_field(&text_field, &mut stdout)?;
@@ -63,10 +61,7 @@ fn run_text_field() -> anyhow::Result<String> {
     Ok(text_field.contents().to_string())
 }
 
-fn render_text_field(
-    text_field: &text_field::TextField,
-    stdout: &mut io::Stdout,
-) -> anyhow::Result<()> {
+fn render_text_field(text_field: &TextField, stdout: &mut io::Stdout) -> anyhow::Result<()> {
     queue!(
         stdout,
         terminal::Clear(terminal::ClearType::All),
@@ -90,7 +85,7 @@ fn run_editor() -> anyhow::Result<String> {
     let mut stdout = io::stdout();
 
     let (terminal_width, terminal_height) = terminal::size()?;
-    let mut editor = editor::Editor::new((terminal_width - 1).into(), terminal_height.into());
+    let mut editor = Editor::new((terminal_width - 1).into(), terminal_height.into());
 
     loop {
         render_editor(&editor, &mut stdout)?;
@@ -121,7 +116,7 @@ fn run_editor() -> anyhow::Result<String> {
     Ok(editor.contents())
 }
 
-fn render_editor(editor: &editor::Editor, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+fn render_editor(editor: &Editor, stdout: &mut io::Stdout) -> anyhow::Result<()> {
     queue!(
         stdout,
         terminal::Clear(terminal::ClearType::All),

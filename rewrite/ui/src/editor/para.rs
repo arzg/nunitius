@@ -1,4 +1,3 @@
-use super::wrap;
 use std::ops::Index;
 use text::{Text, TextBuf};
 
@@ -19,7 +18,7 @@ impl Paragraph {
     pub(super) fn rewrap(&mut self, width: usize) {
         let joined: String = self.lines.iter().map(TextBuf::as_str).collect();
         let joined = Text::new(&joined);
-        let wrapped = wrap(joined, width);
+        let wrapped = crate::wrap(joined, width);
 
         self.lines = wrapped;
     }

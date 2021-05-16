@@ -1,23 +1,7 @@
-use text::{Text, TextBuf};
+use text::Text;
 use unicode_width::UnicodeWidthStr;
 
-pub(super) fn wrap(text: Text<'_>, width: usize) -> Vec<TextBuf> {
-    let mut lines = vec![TextBuf::default()];
-    let mut current_line = 0;
-
-    for word in split_into_words(text, width) {
-        if lines[current_line].width() + word.width() > width {
-            lines.push(word.into_text_buf());
-            current_line += 1;
-        } else {
-            lines[current_line].push(word.as_str());
-        }
-    }
-
-    lines
-}
-
-fn split_into_words(text: Text<'_>, width: usize) -> impl Iterator<Item = Text<'_>> {
+pub(super) fn split_into_words(text: Text<'_>, width: usize) -> impl Iterator<Item = Text<'_>> {
     WordSplitter {
         text,
         grapheme_pos: 0,

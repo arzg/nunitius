@@ -1,13 +1,11 @@
 mod para;
 mod render;
-mod wrap;
 
 use itertools::Itertools;
 use para::{Lines, Paragraph};
 use render::Renderer;
 use text::Text;
 use unicode_width::UnicodeWidthStr;
-use wrap::wrap;
 
 #[derive(Debug)]
 pub struct Editor {

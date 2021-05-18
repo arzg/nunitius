@@ -1,15 +1,19 @@
+use crossterm::style::{style, Styler};
 use crossterm::{cursor, event, queue, terminal};
+use itertools::Itertools;
 use std::convert::TryInto;
 use std::env;
 use std::io::{self, Write};
-use ui::{Editor, TextField};
+use ui::types::StyledText;
+use ui::{Editor, Prompt, TextField};
 
 fn main() -> anyhow::Result<()> {
     if let Some(subcommand) = env::args().nth(1) {
         let input = match subcommand.as_str() {
+            "prompt" => run_prompt()?,
             "text_field" => run_text_field()?,
             "editor" => run_editor()?,
-            _ => anyhow::bail!("must specify either ‘text_field’ or ‘editor’ subcommand"),
+            _ => anyhow::bail!("must specify either ‘prompt’, ‘text_field’ or ‘editor’ subcommand"),
         };
 
         queue!(
@@ -20,8 +24,75 @@ fn main() -> anyhow::Result<()> {
 
         println!("You typed: ‘{}’", input);
     } else {
-        anyhow::bail!("must specify either ‘text_field’ or ‘editor’ subcommand");
+        anyhow::bail!("must specify either ‘prompt’, ‘text_field’ or ‘editor’ subcommand");
     }
+
+    Ok(())
+}
+
+fn run_prompt() -> anyhow::Result<String> {
+    terminal::enable_raw_mode()?;
+
+    let mut stdout = io::stdout();
+
+    let (terminal_width, _) = terminal::size()?;
+    let mut prompt = Prompt::new("Enter your name", (terminal_width - 1).into());
+
+    loop {
+        render_prompt(&prompt, &mut stdout)?;
+
+        let event = event::read()?;
+        match event {
+            event::Event::Key(event::KeyEvent { code, modifiers }) => match (code, modifiers) {
+                (event::KeyCode::Char('c'), event::KeyModifiers::CONTROL)
+                | (event::KeyCode::Enter, _) => break,
+                (event::KeyCode::Char(c), _) => prompt.add(&c.to_string()),
+                (event::KeyCode::Backspace, _) => prompt.backspace(),
+                (event::KeyCode::Up, _) => prompt.move_up(),
+                (event::KeyCode::Down, _) => prompt.move_down(),
+                (event::KeyCode::Left, _) => prompt.move_left(),
+                (event::KeyCode::Right, _) => prompt.move_right(),
+                _ => {}
+            },
+            event::Event::Resize(new_width, _) => prompt.resize((new_width - 1).into()),
+
+            _ => {}
+        }
+    }
+
+    terminal::disable_raw_mode()?;
+
+    Ok(prompt.contents().to_string())
+}
+
+fn render_prompt(prompt: &Prompt, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+    queue!(
+        stdout,
+        terminal::Clear(terminal::ClearType::All),
+        cursor::MoveTo(0, 0)
+    )?;
+
+    write!(
+        stdout,
+        "{}",
+        prompt
+            .render()
+            .iter()
+            .map(|line| {
+                match line {
+                    StyledText::Bold(line) => line.bold(),
+                    StyledText::Regular(line) => style(*line),
+                }
+            })
+            .join("\r\n")
+    )?;
+
+    let (line, column) = prompt.cursor();
+    let line = line.try_into().unwrap();
+    let column = column.try_into().unwrap();
+    queue!(stdout, cursor::MoveTo(column, line))?;
+
+    stdout.flush()?;
 
     Ok(())
 }

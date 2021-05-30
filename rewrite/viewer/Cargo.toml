@@ -5,3 +5,6 @@ name = "nunitius-viewer"
 version = "0.1.0"
 
 [dependencies]
+anyhow = "1.0"
+flume = {version = "0.10.5", default_features = false}
+viewer-protocol = {path = "../viewer-protocol"}

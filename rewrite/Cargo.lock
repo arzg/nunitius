@@ -180,10 +180,20 @@ dependencies = [
 [[package]]
 name = "nunitius-server"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "flume",
+ "server-protocol",
+]
 
 [[package]]
 name = "nunitius-viewer"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "flume",
+ "viewer-protocol",
+]
 
 [[package]]
 name = "parking_lot"
@@ -294,10 +304,8 @@ name = "server-protocol"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "flume",
  "jsonl",
  "model",
- "never",
 ]
 
 [[package]]

@@ -1,10 +1,10 @@
 [package]
 authors = ["Aramis Razzaghipour <aramisnoah@gmail.com>"]
 edition = "2018"
-name = "nunitius-server"
+name = "nunitius-viewer"
 version = "0.1.0"
 
 [dependencies]
 anyhow = "1.0"
 flume = {version = "0.10.5", default_features = false}
-server-protocol = {path = "../server-protocol"}
+viewer-protocol = {path = "../../libs/viewer-protocol"}

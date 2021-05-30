@@ -183,6 +183,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "flume",
+ "server-core",
  "server-protocol",
 ]
 
@@ -298,6 +299,10 @@ dependencies = [
  "ryu",
  "serde",
 ]
+
+[[package]]
+name = "server-core"
+version = "0.1.0"
 
 [[package]]
 name = "server-protocol"

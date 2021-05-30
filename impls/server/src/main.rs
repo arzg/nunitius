@@ -1,4 +1,6 @@
 use flume::{Receiver, Sender};
+use server_protocol::sender::{LoggingIn, SenderConnection};
+use server_protocol::viewer::{SendingPastEvents, ViewerConnection};
 use std::net::{SocketAddr, TcpListener};
 use std::thread;
 
@@ -12,7 +14,7 @@ fn main() -> anyhow::Result<()> {
             let error_tx = error_tx.clone();
 
             thread::spawn(move || {
-                let result = nunitius_server::handle_sender(sender_connection);
+                let result = handle_sender(sender_connection);
                 handle_error(result, HandlerKind::Sender, peer_address, error_tx);
             });
         },
@@ -20,12 +22,20 @@ fn main() -> anyhow::Result<()> {
             let error_tx = error_tx.clone();
 
             thread::spawn(move || {
-                let result = nunitius_server::handle_viewer(viewer_connection);
+                let result = handle_viewer(viewer_connection);
                 handle_error(result, HandlerKind::Viewer, peer_address, error_tx);
             });
         },
         print_error,
     );
+}
+
+fn handle_sender(_sender_connection: SenderConnection<LoggingIn>) -> anyhow::Result<()> {
+    Ok(())
+}
+
+fn handle_viewer(_viewer_connection: ViewerConnection<SendingPastEvents>) -> anyhow::Result<()> {
+    Ok(())
 }
 
 enum HandlerKind {

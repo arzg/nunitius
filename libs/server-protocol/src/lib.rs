@@ -1,15 +1,13 @@
-pub mod sender;
-pub mod viewer;
-
-use sender::{LoggingIn, SenderConnection};
+use jsonl::Connection;
 use std::io::BufReader;
-use std::net::{SocketAddr, TcpListener};
-use viewer::{SendingPastEvents, ViewerConnection};
+use std::net::{SocketAddr, TcpListener, TcpStream};
+
+type TcpConnection = Connection<BufReader<TcpStream>, TcpStream>;
 
 pub fn listen(
     listener: &TcpListener,
-    mut sender_handler: impl FnMut(SenderConnection<LoggingIn>, Option<SocketAddr>),
-    mut viewer_handler: impl FnMut(ViewerConnection<SendingPastEvents>, Option<SocketAddr>),
+    mut sender_handler: impl FnMut(TcpConnection, Option<SocketAddr>),
+    mut viewer_handler: impl FnMut(TcpConnection, Option<SocketAddr>),
     mut error_handler: impl FnMut(anyhow::Error),
 ) -> ! {
     loop {
@@ -21,22 +19,17 @@ pub fn listen(
 
 fn accept(
     listener: &TcpListener,
-    mut sender_handler: impl FnMut(SenderConnection<LoggingIn>, Option<SocketAddr>),
-    mut viewer_handler: impl FnMut(ViewerConnection<SendingPastEvents>, Option<SocketAddr>),
+    mut sender_handler: impl FnMut(TcpConnection, Option<SocketAddr>),
+    mut viewer_handler: impl FnMut(TcpConnection, Option<SocketAddr>),
 ) -> anyhow::Result<()> {
-    let (mut stream, _) = listener.accept()?;
-    let connection_kind = jsonl::read(BufReader::new(&mut stream))?;
+    let (stream, _) = listener.accept()?;
     let peer_address = stream.peer_addr().ok();
+    let mut connection = Connection::new_from_tcp_stream(stream)?;
 
+    let connection_kind = connection.read()?;
     match connection_kind {
-        model::ConnectionKind::Sender => {
-            let sender_connection = SenderConnection::new(stream);
-            sender_handler(sender_connection, peer_address);
-        }
-        model::ConnectionKind::Viewer => {
-            let viewer_connection = ViewerConnection::new(stream);
-            viewer_handler(viewer_connection, peer_address);
-        }
+        model::ConnectionKind::Sender => sender_handler(connection, peer_address),
+        model::ConnectionKind::Viewer => viewer_handler(connection, peer_address),
     }
 
     Ok(())

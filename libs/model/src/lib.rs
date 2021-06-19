@@ -1,28 +1,42 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConnectionKind {
     Sender,
     Viewer,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Event {
-    pub payload: EventPayload,
+    pub data: EventData,
     pub user: User,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum EventPayload {
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum EventData {
     Message(Message),
+    Login,
+    Logout,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SenderRequest {
+    Login(User),
+    NewMessage(Message),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum LoginResponse {
+    Succeeded,
+    Taken,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub body: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct User {
     pub nickname: String,
 }

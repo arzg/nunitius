@@ -77,7 +77,7 @@ impl Prompt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::StyledText::*;
+    use StyledText::*;
 
     #[test]
     fn wrap_at_given_width() {

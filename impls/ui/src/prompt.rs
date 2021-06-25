@@ -1,25 +1,24 @@
 use crate::types::StyledText;
-use crate::TextField;
-use text::{Text, TextBuf};
+use crate::{TextField, WrappedLabel};
 
 #[derive(Debug)]
 pub struct Prompt {
-    wrapped_prompt: Vec<TextBuf>,
+    label: WrappedLabel,
     text_field: TextField,
 }
 
 impl Prompt {
     pub fn new(prompt: &'static str, width: usize) -> Self {
         Self {
-            wrapped_prompt: text::wrap(&Text::new(prompt), width),
+            label: WrappedLabel::new(prompt, width),
             text_field: TextField::new(width),
         }
     }
 
     pub fn render(&self) -> Vec<StyledText<'_>> {
-        self.wrapped_prompt
-            .iter()
-            .map(TextBuf::as_str)
+        self.label
+            .render()
+            .into_iter()
             .map(StyledText::Bold)
             .chain(std::iter::once(StyledText::Regular(
                 self.text_field.render(),
@@ -32,11 +31,11 @@ impl Prompt {
     }
 
     pub fn cursor(&self) -> (usize, usize) {
-        (self.wrapped_prompt.len(), self.text_field.cursor())
+        (self.label.num_rows(), self.text_field.cursor())
     }
 
     pub fn resize(&mut self, width: usize) {
-        self.rewrap_prompt(width);
+        self.label.resize(width);
         self.text_field.resize(width);
     }
 
@@ -62,15 +61,6 @@ impl Prompt {
 
     pub fn move_down(&mut self) {
         self.text_field.move_down();
-    }
-
-    fn rewrap_prompt(&mut self, width: usize) {
-        self.wrapped_prompt = text::wrap(&self.joined_prompt().as_text(), width);
-    }
-
-    fn joined_prompt(&self) -> TextBuf {
-        let joined = self.wrapped_prompt.iter().map(TextBuf::as_str).collect();
-        TextBuf::new(joined)
     }
 }
 

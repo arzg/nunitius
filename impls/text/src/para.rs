@@ -1,8 +1,8 @@
+use crate::{Text, TextBuf};
 use std::ops::Index;
-use text::{Text, TextBuf};
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Paragraph {
+pub struct Paragraph {
     lines: Vec<TextBuf>, // invariant: lines.len() is always >= 1
 }
 
@@ -15,20 +15,20 @@ impl Default for Paragraph {
 }
 
 impl Paragraph {
-    pub(super) fn rewrap(&mut self, width: usize) {
+    pub fn rewrap(&mut self, width: usize) {
         let joined: String = self.lines.iter().map(TextBuf::as_str).collect();
         let joined = Text::new(&joined);
-        let wrapped = crate::wrap(joined, width);
+        let wrapped = crate::wrap(&joined, width);
 
         self.lines = wrapped;
     }
 
-    pub(super) fn idx_of_coords(&self, line: usize, column: usize) -> usize {
+    pub fn idx_of_coords(&self, line: usize, column: usize) -> usize {
         let num_bytes_before_line: usize = self.lines[..line].iter().map(|l| l.len()).sum();
         num_bytes_before_line + column
     }
 
-    pub(super) fn coords_of_idx(&self, idx: usize) -> (usize, usize) {
+    pub fn coords_of_idx(&self, idx: usize) -> (usize, usize) {
         let mut line = 0;
         let mut column = 0;
         let mut num_stepped = 0;
@@ -54,7 +54,7 @@ impl Paragraph {
         (line, column)
     }
 
-    pub(super) fn split_off(&mut self, line: usize, column: usize) -> Self {
+    pub fn split_off(&mut self, line: usize, column: usize) -> Self {
         let mut other_lines = self.lines.split_off(line);
 
         let (before, after) = other_lines[0].split(column);
@@ -64,23 +64,23 @@ impl Paragraph {
         Self { lines: other_lines }
     }
 
-    pub(super) fn join(&mut self, mut p: Self) {
+    pub fn join(&mut self, mut p: Self) {
         self.lines.append(&mut p.lines);
     }
 
-    pub(super) fn insert(&mut self, s: &str, line: usize, column: usize) {
+    pub fn insert(&mut self, s: &str, line: usize, column: usize) {
         self.lines[line].insert(column, s);
     }
 
-    pub(super) fn remove(&mut self, line: usize, column: usize) {
+    pub fn remove(&mut self, line: usize, column: usize) {
         self.lines[line].remove(column);
     }
 
-    pub(super) fn lines(&self) -> Lines<'_> {
+    pub fn lines(&self) -> Lines<'_> {
         Lines::new(self)
     }
 
-    pub(super) fn num_lines(&self) -> usize {
+    pub fn num_lines(&self) -> usize {
         self.lines.len()
     }
 }
@@ -93,7 +93,7 @@ impl Index<usize> for Paragraph {
     }
 }
 
-pub(super) struct Lines<'a> {
+pub struct Lines<'a> {
     para: &'a Paragraph,
     line_idx: usize,
 }

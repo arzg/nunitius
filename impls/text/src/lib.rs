@@ -1,3 +1,8 @@
+pub mod para;
+
+mod wrap;
+pub use wrap::wrap;
+
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 use unicode_segmentation::UnicodeSegmentation;

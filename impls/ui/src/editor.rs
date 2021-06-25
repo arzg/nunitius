@@ -1,9 +1,8 @@
-mod para;
 mod render;
 
 use itertools::Itertools;
-use para::{Lines, Paragraph};
 use render::Renderer;
+use text::para::{Lines, Paragraph};
 use text::Text;
 use unicode_width::UnicodeWidthStr;
 

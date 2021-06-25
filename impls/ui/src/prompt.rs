@@ -11,7 +11,7 @@ pub struct Prompt {
 impl Prompt {
     pub fn new(prompt: &'static str, width: usize) -> Self {
         Self {
-            wrapped_prompt: crate::wrap(Text::new(prompt), width),
+            wrapped_prompt: text::wrap(&Text::new(prompt), width),
             text_field: TextField::new(width),
         }
     }
@@ -65,7 +65,7 @@ impl Prompt {
     }
 
     fn rewrap_prompt(&mut self, width: usize) {
-        self.wrapped_prompt = crate::wrap(self.joined_prompt().as_text(), width);
+        self.wrapped_prompt = text::wrap(&self.joined_prompt().as_text(), width);
     }
 
     fn joined_prompt(&self) -> TextBuf {

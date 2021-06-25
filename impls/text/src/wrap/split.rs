@@ -1,7 +1,10 @@
-use text::Text;
+use crate::Text;
 use unicode_width::UnicodeWidthStr;
 
-pub(super) fn split_into_words(text: Text<'_>, width: usize) -> impl Iterator<Item = Text<'_>> {
+pub(super) fn split_into_words<'a>(
+    text: &'a Text<'a>,
+    width: usize,
+) -> impl Iterator<Item = Text<'a>> {
     WordSplitter {
         text,
         grapheme_pos: 0,
@@ -12,7 +15,7 @@ pub(super) fn split_into_words(text: Text<'_>, width: usize) -> impl Iterator<It
 
 #[derive(Debug)]
 struct WordSplitter<'a> {
-    text: Text<'a>,
+    text: &'a Text<'a>,
     grapheme_pos: usize,
     visual_pos: usize,
     width: usize,

@@ -1,10 +1,10 @@
 mod split;
 
+use crate::{Text, TextBuf};
 use split::split_into_words;
-use text::{Text, TextBuf};
 use unicode_width::UnicodeWidthStr;
 
-pub(crate) fn wrap(text: Text<'_>, width: usize) -> Vec<TextBuf> {
+pub fn wrap(text: &Text<'_>, width: usize) -> Vec<TextBuf> {
     let mut lines = vec![TextBuf::default()];
     let mut current_line = 0;
 
@@ -26,7 +26,7 @@ mod tests {
 
     fn check<const N: usize>(input: &str, width: usize, expected: [&str; N]) {
         let input = Text::new(input);
-        let wrapped = wrap(input, width);
+        let wrapped = wrap(&input, width);
 
         assert_eq!(
             wrapped,

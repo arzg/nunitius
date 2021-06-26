@@ -1,0 +1,8 @@
+[package]
+edition = "2018"
+name = "sender-core"
+version = "0.1.0"
+
+[dependencies]
+delegate = "0.5.2"
+ui = {path = "../ui"}

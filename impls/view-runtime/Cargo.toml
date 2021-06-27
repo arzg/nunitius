@@ -1,0 +1,10 @@
+[package]
+edition = "2018"
+name = "view-runtime"
+version = "0.1.0"
+
+[dependencies]
+crossterm = "0.20.0"
+flume = {version = "0.10.7", default_features = false, features = ["select"]}
+ui-types = {path = "../ui-types"}
+view = {path = "../view"}

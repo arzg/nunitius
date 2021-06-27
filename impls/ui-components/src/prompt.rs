@@ -1,5 +1,5 @@
-use crate::types::StyledText;
 use crate::{TextField, WrappedLabel};
+use ui_types::StyledText;
 
 #[derive(Debug)]
 pub struct Prompt {

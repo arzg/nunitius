@@ -1,7 +1,7 @@
 use delegate::delegate;
-use ui::types::StyledText;
-use ui::Prompt;
-use ui::WrappedLabel;
+use ui_components::Prompt;
+use ui_components::WrappedLabel;
+use ui_types::StyledText;
 
 #[derive(Debug)]
 pub struct LoggingInView {

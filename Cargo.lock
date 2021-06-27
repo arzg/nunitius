@@ -209,7 +209,8 @@ name = "sender-core"
 version = "0.1.0"
 dependencies = [
  "delegate",
- "ui",
+ "ui-components",
+ "ui-types",
 ]
 
 [[package]]
@@ -324,13 +325,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "ui"
+name = "ui-components"
 version = "0.1.0"
 dependencies = [
  "itertools",
  "text",
+ "ui-types",
  "unicode-width",
 ]
+
+[[package]]
+name = "ui-types"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-segmentation"

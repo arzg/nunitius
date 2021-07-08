@@ -30,10 +30,12 @@ impl LoggingInView {
     }
 
     pub fn resize(&mut self, width: usize) {
-        self.nickname_prompt.resize(width);
+        self.width = width;
+
+        self.nickname_prompt.resize(self.width);
 
         if let Some(ref mut label) = self.taken {
-            label.resize(width);
+            label.resize(self.width);
         }
     }
 
@@ -122,6 +124,24 @@ mod tests {
             ]
         );
         assert_eq!(view.cursor(), (2, 2));
+
+        view.resize(5);
+        view.mark_nickname_taken();
+
+        assert_eq!(
+            view.render(),
+            [
+                Bold("Enter"),
+                Bold(" a "),
+                Bold("nickn"),
+                Bold("ame"),
+                Regular("me"),
+                Red("nickn"),
+                Red("ame "),
+                Red("is "),
+                Red("taken")
+            ]
+        );
     }
 
     #[test]
